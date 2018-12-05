@@ -1,25 +1,35 @@
 /* Copyright (c) 2014 Dr David H. Akehurst (itemis), All Rights Reserved
  *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
+ * 
+ * You can freely decide which license you want to apply to 
+ * the project.
+ * 
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
 package com.sun.jna.platform.win32.COM;
 
 import com.sun.jna.Pointer;
 import com.sun.jna.Structure;
-import com.sun.jna.WString;
-import com.sun.jna.platform.win32.WTypes.BSTRByReference;
-import com.sun.jna.platform.win32.WTypes.LPSTR;
 import com.sun.jna.platform.win32.WinNT;
 import com.sun.jna.platform.win32.Guid.CLSID;
-import com.sun.jna.platform.win32.WinNT.HRESULT;
+import com.sun.jna.platform.win32.Ole32;
+import com.sun.jna.platform.win32.WTypes;
+import com.sun.jna.ptr.PointerByReference;
 
 public class Moniker extends Unknown implements IMoniker {
 
@@ -121,13 +131,26 @@ public class Moniker extends Unknown implements IMoniker {
 	}
 
 	@Override
-	public HRESULT GetDisplayName(Pointer pbc, Pointer pmkToLeft, BSTRByReference ppszDisplayName) {
+	public String GetDisplayName(Pointer pbc, Pointer pmkToLeft) {
 		final int vTableId = vTableIdStart + 13;
 
+                PointerByReference ppszDisplayNameRef = new PointerByReference();
+                
 		WinNT.HRESULT hr = (WinNT.HRESULT) this._invokeNativeObject(vTableId, new Object[] { this.getPointer(), pbc,
-				pmkToLeft, ppszDisplayName }, WinNT.HRESULT.class);
+				pmkToLeft, ppszDisplayNameRef }, WinNT.HRESULT.class);
 
-		return hr;
+                COMUtils.checkRC(hr);
+
+                Pointer ppszDisplayName = ppszDisplayNameRef.getValue();
+                if(ppszDisplayName == null) {
+                    return null;
+                }
+                
+                WTypes.LPOLESTR oleStr = new WTypes.LPOLESTR(ppszDisplayName);
+                String name = oleStr.getValue();
+                Ole32.INSTANCE.CoTaskMemFree(ppszDisplayName);
+
+		return name;
 	}
 
 	@Override

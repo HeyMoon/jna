@@ -1,23 +1,36 @@
 /* Copyright (c) 2015 Andreas "PAX" L\u00FCck, All Rights Reserved
+ *
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
  * 
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
+ * You can freely decide which license you want to apply to 
+ * the project.
  * 
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.  
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
 package com.sun.jna.platform.win32;
 
-import java.util.Arrays;
 import java.util.List;
 
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 import com.sun.jna.Structure;
+import com.sun.jna.Structure.FieldOrder;
+import com.sun.jna.platform.win32.BaseTSD.SIZE_T;
+import com.sun.jna.platform.win32.WinDef.DWORD;
 import com.sun.jna.platform.win32.WinDef.HMODULE;
 import com.sun.jna.platform.win32.WinNT.HANDLE;
 import com.sun.jna.ptr.IntByReference;
@@ -28,16 +41,16 @@ import com.sun.jna.win32.W32APIOptions;
  * The process status application programming interface (PSAPI) is a helper
  * library that makes it easier for you to obtain information about processes
  * and device drivers.
- * 
+ *
  * @author Andreas "PAX" L&uuml;ck, onkelpax-git[at]yahoo.de
  */
 public interface Psapi extends StdCallLibrary {
-    Psapi INSTANCE = Native.loadLibrary("psapi", Psapi.class, W32APIOptions.DEFAULT_OPTIONS);
+    Psapi INSTANCE = Native.load("psapi", Psapi.class, W32APIOptions.DEFAULT_OPTIONS);
     
     /**
      * Retrieves the fully qualified path for the file containing the specified
      * module.
-     * 
+     *
      * @param process
      *            A handle to the process that contains the module.
      * @param module
@@ -57,11 +70,11 @@ public interface Psapi extends StdCallLibrary {
      *         {@link Kernel32Util#getLastErrorMessage()}.
      */
     int GetModuleFileNameExA(HANDLE process, HANDLE module, byte[] lpFilename, int nSize);
-    
+
     /**
      * Retrieves the fully qualified path for the file containing the specified
      * module.
-     * 
+     *
      * @param process
      *            A handle to the process that contains the module.
      * @param module
@@ -85,7 +98,7 @@ public interface Psapi extends StdCallLibrary {
     /**
      * Retrieves the fully qualified path for the file containing the specified
      * module.
-     * 
+     *
      * @param process
      *            A handle to the process that contains the module.
      * @param module
@@ -105,9 +118,9 @@ public interface Psapi extends StdCallLibrary {
      *         {@link Kernel32Util#getLastErrorMessage()}.
      */
     int GetModuleFileNameEx(HANDLE process, HANDLE module, Pointer lpFilename, int nSize);
-    
+
     /**
-     * 
+     *
      * The EnumProcessModules function is primarily designed for use by
      * debuggers and similar applications that must extract module information
      * from another process.<br>
@@ -154,7 +167,7 @@ public interface Psapi extends StdCallLibrary {
      * To ensure correct resolution of symbols, add Psapi.lib to the TARGETLIBS
      * macro and compile the program with -DPSAPI_VERSION=1.<br>
      * To use run-time dynamic linking, load Psapi.dll.
-     * 
+     *
      * @param hProcess
      *            A handle to the process.
      * @param lphModule
@@ -170,7 +183,7 @@ public interface Psapi extends StdCallLibrary {
      * @see <a href="http://msdn.microsoft.com/en-us/library/ms682631(VS.85).aspx">MSDN/a>
      */
     boolean EnumProcessModules(HANDLE hProcess, HMODULE[] lphModule, int cb, IntByReference lpcbNeeded);
-    
+
     /**
      * To get information for the calling process, pass the handle returned by
      * GetCurrentProcess.<br>
@@ -193,7 +206,7 @@ public interface Psapi extends StdCallLibrary {
      * To ensure correct resolution of symbols, add Psapi.lib to the TARGETLIBS
      * macro and compile the program with -DPSAPI_VERSION=1. <br>
      * To use run-time dynamic linking, load Psapi.dll.
-     * 
+     *
      * @param hProcess
      *            A handle to the process that contains the module. The handle
      *            must have the PROCESS_QUERY_INFORMATION and PROCESS_VM_READ
@@ -201,7 +214,7 @@ public interface Psapi extends StdCallLibrary {
      *            Access Rights.
      * @param hModule
      *            A handle to the module.
-     * 
+     *
      * @param lpmodinfo
      *            A pointer to the MODULEINFO structure that receives
      *            information about the module.
@@ -213,7 +226,7 @@ public interface Psapi extends StdCallLibrary {
      * @see <a href="http://msdn.microsoft.com/en-us/library/ms683201(VS.85).aspx">MSDN</a>
      */
     boolean GetModuleInformation(HANDLE hProcess, HMODULE hModule, MODULEINFO lpmodinfo, int cb);
-    
+
     /**
      * @param hProcess
      *            A handle to the process. The handle must have the
@@ -235,14 +248,50 @@ public interface Psapi extends StdCallLibrary {
      */
     int GetProcessImageFileName(HANDLE hProcess, char[] lpImageFileName, int nSize);
 
+
+    /**
+     * Retrieves the performance values contained in the
+     * {@link PERFORMANCE_INFORMATION} structure.
+     * 
+     * @param pPerformanceInformation
+     *            A pointer to a {@link PERFORMANCE_INFORMATION} structure that
+     *            receives the performance information.
+     * @param cb
+     *            The size of the {@link PERFORMANCE_INFORMATION} structure, in
+     *            bytes.
+     * @return If the function succeeds, the return value is TRUE. If the
+     *         function fails, the return value is FALSE. To get extended error
+     *         information, call {@link Kernel32Util#getLastErrorMessage()}.
+     * @see <a href="http://msdn.microsoft.com/en-us/library/ms683210(VS.85).aspx">MSDN</a>
+     */
+    boolean GetPerformanceInfo(PERFORMANCE_INFORMATION pPerformanceInformation, int cb);
+
+    @FieldOrder({"lpBaseOfDll", "SizeOfImage", "EntryPoint"})
     class MODULEINFO extends Structure {
         public Pointer EntryPoint;
         public Pointer lpBaseOfDll;
         public int     SizeOfImage;
+    }
 
-        @Override
-        protected List getFieldOrder() {
-            return Arrays.asList(new String[] { "lpBaseOfDll", "SizeOfImage", "EntryPoint" });
-        }
+    @FieldOrder({"cb", "CommitTotal", "CommitLimit", "CommitPeak",
+        "PhysicalTotal", "PhysicalAvailable", "SystemCache", "KernelTotal",
+        "KernelPaged", "KernelNonpaged", "PageSize", "HandleCount",
+        "ProcessCount", "ThreadCount"})
+    class PERFORMANCE_INFORMATION extends Structure {
+
+        public DWORD cb;
+        public SIZE_T CommitTotal;
+        public SIZE_T CommitLimit;
+        public SIZE_T CommitPeak;
+        public SIZE_T PhysicalTotal;
+        public SIZE_T PhysicalAvailable;
+        public SIZE_T SystemCache;
+        public SIZE_T KernelTotal;
+        public SIZE_T KernelPaged;
+        public SIZE_T KernelNonpaged;
+        public SIZE_T PageSize;
+        public DWORD HandleCount;
+        public DWORD ProcessCount;
+        public DWORD ThreadCount;
     }
 }

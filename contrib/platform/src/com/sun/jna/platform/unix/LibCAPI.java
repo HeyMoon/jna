@@ -1,14 +1,25 @@
 /* Copyright (c) 2015 Goldstein Lyor, All Rights Reserved
  *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
+ * 
+ * You can freely decide which license you want to apply to 
+ * the project.
+ * 
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
 package com.sun.jna.platform.unix;
 
@@ -32,12 +43,12 @@ public interface LibCAPI extends Reboot, Resource {
 
     // see man(2) get/set hostname
     int HOST_NAME_MAX = 255; // not including the '\0'
-    int gethostname(char[] name, int len);
-    int sethostname(char[] name, int len);
+    int gethostname(byte[] name, int len);
+    int sethostname(String name, int len);
 
     // see man(2) get/set domainname
-    int getdomainname(char[] name, int len);
-    int setdomainname(char[] name, int len);
+    int getdomainname(byte[] name, int len);
+    int setdomainname(String name, int len);
 
     /**
      * @param name Environment variable name
@@ -73,4 +84,18 @@ public interface LibCAPI extends Reboot, Resource {
      * @see <A HREF="https://www.freebsd.org/cgi/man.cgi?query=setenv&sektion=3">getenv(3)</A>
      */
     int unsetenv(String name);
+    
+    /**
+     * The getloadavg() function returns the number of processes in the system
+     * run queue averaged over various periods of time.  Up to nelem samples are
+     * retrieved and assigned to successive elements of loadavg[].  The system
+     * imposes a maximum of 3 samples, representing averages over the last 1, 5,
+     * and 15 minutes, respectively.
+     * @param loadavg An array of doubles which will be filled with the results
+     * @param nelem Number of samples to return
+     * @return If the load average was unobtainable, -1 is returned; otherwise, 
+     * the number of samples actually retrieved is returned.
+     * @see <A HREF="https://www.freebsd.org/cgi/man.cgi?query=getloadavg&sektion=3">getloadavg(3)</A>
+     */
+    int getloadavg(double[] loadavg, int nelem);
 }

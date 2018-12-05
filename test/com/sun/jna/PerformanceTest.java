@@ -1,14 +1,25 @@
 /* Copyright (c) 2009-2015 Timothy Wall, All Rights Reserved
  *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- * <p/>
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
+ * 
+ * You can freely decide which license you want to apply to 
+ * the project.
+ * 
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
 package com.sun.jna;
 
@@ -18,7 +29,7 @@ import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Map;
-import java.util.HashMap;
+import java.util.Collections;
 import java.lang.reflect.Method;
 
 import com.sun.jna.DirectTest.TestInterface;
@@ -61,6 +72,8 @@ public class PerformanceTest extends TestCase implements Paths {
 
     static class CLibrary {
         public static class size_t extends IntegerType {
+            private static final long serialVersionUID = 1L;
+
             public size_t() {
                 super(Native.POINTER_SIZE);
             }
@@ -117,12 +130,12 @@ public class PerformanceTest extends TestCase implements Paths {
         Pointer pb = Native.getDirectBufferPointer(b);
 
         String mname = Platform.MATH_LIBRARY_NAME;
-        MathInterface mlib = Native.loadLibrary(mname, MathInterface.class);
+        MathInterface mlib = Native.load(mname, MathInterface.class);
         Function f = NativeLibrary.getInstance(mname).getFunction("cos");
 
         ///////////////////////////////////////////
         // cos
-        Object[] args = { new Double(0) };
+        Object[] args = { Double.valueOf(0) };
         double dresult;
         long start = System.currentTimeMillis();
         for (int i=0;i < COUNT;i++) {
@@ -195,11 +208,10 @@ public class PerformanceTest extends TestCase implements Paths {
         delta = System.currentTimeMillis() - start;
         System.out.println("cos (pure java): " + delta + "ms");
 
-        Pointer presult;
         String cname = Platform.C_LIBRARY_NAME;
-        Map options = new HashMap();
+        Map<String, ?> options = Collections.<String, Object>emptyMap();
         if (Platform.isWindows()) {
-            options.put(Library.OPTION_FUNCTION_MAPPER, new FunctionMapper() {
+            options = Collections.singletonMap(Library.OPTION_FUNCTION_MAPPER, new FunctionMapper() {
                 @Override
                 public String getFunctionName(NativeLibrary library, Method method) {
                     String name = method.getName();
@@ -210,7 +222,7 @@ public class PerformanceTest extends TestCase implements Paths {
                 }
             });
         }
-        CInterface clib = Native.loadLibrary(cname, CInterface.class, options);
+        CInterface clib = Native.load(cname, CInterface.class, options);
 
         ///////////////////////////////////////////
         // getpid
@@ -247,50 +259,46 @@ public class PerformanceTest extends TestCase implements Paths {
         // memset
         start = System.currentTimeMillis();
         for (int i=0;i < COUNT;i++) {
-            presult = clib.memset(null, 0, 0);
+            Pointer presult = clib.memset(null, 0, 0);
         }
         delta = System.currentTimeMillis() - start;
         System.out.println("memset (JNA interface): " + delta + "ms");
 
         f = NativeLibrary.getInstance(cname).getFunction("memset");
-        args = new Object[] { null, new Integer(0), new Integer(0)};
+        args = new Object[] { null, Integer.valueOf(0), Integer.valueOf(0)};
         start = System.currentTimeMillis();
         for (int i=0;i < COUNT;i++) {
-            presult = f.invokePointer(args);
+            Pointer presult = f.invokePointer(args);
         }
         delta = System.currentTimeMillis() - start;
         System.out.println("memset (JNA function): " + delta + "ms");
 
         start = System.currentTimeMillis();
         for (int i=0;i < COUNT;i++) {
-            presult = CLibrary.memset((Pointer)null, 0, new CLibrary.size_t(0));
+            Pointer presult = CLibrary.memset((Pointer)null, 0, new CLibrary.size_t(0));
         }
         delta = System.currentTimeMillis() - start;
         System.out.println("memset (JNA direct Pointer/size_t): " + delta + "ms");
         start = System.currentTimeMillis();
         if (Native.POINTER_SIZE == 4) {
             for (int i=0;i < COUNT;i++) {
-                presult = CLibrary.memset((Pointer)null, 0, 0);
+                Pointer presult = CLibrary.memset((Pointer)null, 0, 0);
             }
-        }
-        else {
+        } else {
             for (int i=0;i < COUNT;i++) {
-                presult = CLibrary.memset((Pointer)null, 0, 0L);
+                Pointer presult = CLibrary.memset((Pointer)null, 0, 0L);
             }
         }
         delta = System.currentTimeMillis() - start;
         System.out.println("memset (JNA direct Pointer/primitive): " + delta + "ms");
-        int iresult;
-        long jresult;
         start = System.currentTimeMillis();
         if (Native.POINTER_SIZE == 4) {
             for (int i=0;i < COUNT;i++) {
-                iresult = CLibrary.memset(0, 0, 0);
+                int iresult = CLibrary.memset(0, 0, 0);
             }
-        }
-        else {
+        } else {
             for (int i=0;i < COUNT;i++) {
-                jresult = CLibrary.memset(0L, 0, 0L);
+                long jresult = CLibrary.memset(0L, 0, 0L);
             }
         }
         delta = System.currentTimeMillis() - start;
@@ -340,7 +348,7 @@ public class PerformanceTest extends TestCase implements Paths {
 
         start = System.currentTimeMillis();
         for (int i=0;i < COUNT;i++) {
-            Native.setMemory(0L, 0L, (byte)0);
+            Native.setMemory(Pointer.NULL, 0L, 0L, 0L, (byte)0);
         }
         delta = System.currentTimeMillis() - start;
         System.out.println("memset (JNI): " + delta + "ms");
@@ -350,7 +358,7 @@ public class PerformanceTest extends TestCase implements Paths {
         String str = "performance test";
         start = System.currentTimeMillis();
         for (int i=0;i < COUNT;i++) {
-            iresult = clib.strlen(str);
+            int iresult = clib.strlen(str);
         }
         delta = System.currentTimeMillis() - start;
         System.out.println("strlen (JNA interface): " + delta + "ms");
@@ -359,28 +367,28 @@ public class PerformanceTest extends TestCase implements Paths {
         args = new Object[] { str };
         start = System.currentTimeMillis();
         for (int i=0;i < COUNT;i++) {
-            iresult = f.invokeInt(args);
+            int iresult = f.invokeInt(args);
         }
         delta = System.currentTimeMillis() - start;
         System.out.println("strlen (JNA function): " + delta + "ms");
 
         start = System.currentTimeMillis();
         for (int i=0;i < COUNT;i++) {
-            iresult = CLibrary.strlen(str);
+            int iresult = CLibrary.strlen(str);
         }
         delta = System.currentTimeMillis() - start;
         System.out.println("strlen (JNA direct - String): " + delta + "ms");
 
         start = System.currentTimeMillis();
         for (int i=0;i < COUNT;i++) {
-            iresult = CLibrary.strlen(new NativeString(str).getPointer());
+            int iresult = CLibrary.strlen(new NativeString(str).getPointer());
         }
         delta = System.currentTimeMillis() - start;
         System.out.println("strlen (JNA direct - Pointer): " + delta + "ms");
 
         start = System.currentTimeMillis();
         for (int i=0;i < COUNT;i++) {
-            iresult = CLibrary.strlen(Native.toByteArray(str));
+            int iresult = CLibrary.strlen(Native.toByteArray(str));
         }
         delta = System.currentTimeMillis() - start;
         System.out.println("strlen (JNA direct - byte[]): " + delta + "ms");
@@ -391,7 +399,7 @@ public class PerformanceTest extends TestCase implements Paths {
             b.position(0);
             b.put(bytes);
             b.put((byte)0);
-            iresult = CLibrary.strlen(b);
+            int iresult = CLibrary.strlen(b);
         }
         delta = System.currentTimeMillis() - start;
         System.out.println("strlen (JNA direct - Buffer): " + delta + "ms");
@@ -410,7 +418,7 @@ public class PerformanceTest extends TestCase implements Paths {
                 b.put(str.getBytes());
                 b.put((byte)0);
                 Native.ffi_call(cif, f.peer, resp, argv);
-                iresult = b.getInt(4);
+                int iresult = b.getInt(4);
             }
             delta = System.currentTimeMillis() - start;
         }
@@ -428,7 +436,7 @@ public class PerformanceTest extends TestCase implements Paths {
                 b.put(str.getBytes());
                 b.put((byte)0);
                 Native.ffi_call(cif, f.peer, resp, argv);
-                jresult = b.getLong(8);
+                long jresult = b.getLong(8);
             }
             delta = System.currentTimeMillis() - start;
         }
@@ -469,7 +477,7 @@ public class PerformanceTest extends TestCase implements Paths {
 
         ///////////////////////////////////////////
         // Callbacks
-        TestInterface tlib = Native.loadLibrary("testlib", TestInterface.class);
+        TestInterface tlib = Native.load("testlib", TestInterface.class);
         start = System.currentTimeMillis();
         TestInterface.Int32Callback cb = new TestInterface.Int32Callback() {
             @Override

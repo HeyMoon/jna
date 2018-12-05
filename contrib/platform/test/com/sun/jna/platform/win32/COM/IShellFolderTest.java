@@ -4,16 +4,19 @@ package com.sun.jna.platform.win32.COM;
  * @author L W Ahonen, lwahonen@iki.fi
  */
 
-import junit.framework.TestCase;
-
-
 import com.sun.jna.Pointer;
-import com.sun.jna.platform.win32.*;
-import com.sun.jna.ptr.PointerByReference;
 import junit.framework.TestCase;
+
+import com.sun.jna.platform.win32.*;
+import com.sun.jna.platform.win32.Guid.REFIID;
+import com.sun.jna.platform.win32.ShTypes.STRRET;
+import com.sun.jna.ptr.PointerByReference;
 
 public class IShellFolderTest extends TestCase {
-
+    static {
+        ClassLoader.getSystemClassLoader().setDefaultAssertionStatus(true);
+    }
+        
     private IShellFolder psfMyComputer;
 
     public static WinNT.HRESULT BindToCsidl(int csidl, Guid.REFIID riid, PointerByReference ppv) {
@@ -35,14 +38,12 @@ public class IShellFolderTest extends TestCase {
         Ole32.INSTANCE.CoTaskMemFree(pidl.getValue());
         return hr;
     }
-
+    
     public void setUp() throws Exception {
-        Ole32.INSTANCE.CoInitialize(null);
-        int CSIDL_DRIVES = 0x0011;
         WinNT.HRESULT hr = Ole32.INSTANCE.CoInitialize(null);
         assertTrue(COMUtils.SUCCEEDED(hr));
         PointerByReference psfMyComputerPTR = new PointerByReference(Pointer.NULL);
-        hr = BindToCsidl(CSIDL_DRIVES, new Guid.REFIID(IShellFolder.IID_ISHELLFOLDER), psfMyComputerPTR);
+        hr = BindToCsidl(ShlObj.CSIDL_DRIVES, new REFIID(IShellFolder.IID_ISHELLFOLDER), psfMyComputerPTR);
         assertTrue(COMUtils.SUCCEEDED(hr));
         psfMyComputer = IShellFolder.Converter.PointerToIShellFolder(psfMyComputerPTR);
     }
@@ -64,7 +65,7 @@ public class IShellFolderTest extends TestCase {
         IEnumIDList peidl = IEnumIDList.Converter.PointerToIEnumIDList(peidlPTR);
         PointerByReference pidlItem = new PointerByReference();
         while (peidl.Next(1, pidlItem, null).intValue() == COMUtils.S_OK) {
-            PointerByReference sr = new PointerByReference();
+            STRRET sr = new STRRET();
             hr = psfMyComputer.GetDisplayNameOf(pidlItem.getValue(), 0, sr);
             assertTrue(COMUtils.SUCCEEDED(hr));
             PointerByReference pszName = new PointerByReference();

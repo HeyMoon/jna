@@ -1,14 +1,25 @@
 /* Copyright (c) 2010, 2013 Daniel Doubrovkine, Markus Karg, All Rights Reserved
  *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
+ * 
+ * You can freely decide which license you want to apply to 
+ * the project.
+ * 
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
 package com.sun.jna.platform.win32;
 
@@ -30,6 +41,7 @@ import com.sun.jna.platform.win32.WinNT.HANDLEByReference;
 import com.sun.jna.platform.win32.WinNT.HRESULT;
 import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.ptr.PointerByReference;
+import com.sun.jna.win32.W32APITypeMapper;
 
 /**
  * Kernel32 utility API.
@@ -55,27 +67,143 @@ public abstract class Kernel32Util implements WinDef {
     }
 
     /**
-     * Format a message from the value obtained from
-     * {@link Kernel32#GetLastError} or {@link Native#getLastError}.
+     * Invokes {@link Kernel32#LocalFree(Pointer)} and checks if it succeeded.
      *
-     * @param code
-     *            int
+     * @param ptr The {@link Pointer} to the memory to be released - ignored if NULL
+     * @throws Win32Exception if non-{@code ERROR_SUCCESS} code reported
+     */
+    public static void freeLocalMemory(Pointer ptr) {
+        Pointer res = Kernel32.INSTANCE.LocalFree(ptr);
+        if (res != null) {
+            throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
+        }
+    }
+
+    /**
+     * Invokes {@link Kernel32#GlobalFree(Pointer)} and checks if it succeeded.
+     *
+     * @param ptr The {@link Pointer} to the memory to be released - ignored if NULL
+     * @throws Win32Exception if non-{@code ERROR_SUCCESS} code reported
+     */
+    public static void freeGlobalMemory(Pointer ptr) {
+        Pointer res = Kernel32.INSTANCE.GlobalFree(ptr);
+        if (res != null) {
+            throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
+        }
+    }
+
+    /**
+     * Closes all referenced handles. If an exception is thrown for
+     * a specific handle, then it is accumulated until all
+     * handles have been closed. If more than one exception occurs,
+     * then it is added as a suppressed exception to the first one.
+     * Once closed all handles, the accumulated exception (if any) is thrown
+     *
+     * @param refs The references to close
+     * @see #closeHandleRef(WinNT.HANDLEByReference)
+     */
+    public static void closeHandleRefs(HANDLEByReference... refs) {
+        Win32Exception err = null;
+        for (HANDLEByReference r : refs) {
+            try {
+                closeHandleRef(r);
+            } catch(Win32Exception e) {
+                if (err == null) {
+                    err = e;
+                } else {
+                    err.addSuppressedReflected(e);
+                }
+            }
+        }
+
+        if (err != null) {
+            throw err;
+        }
+    }
+    /**
+     * Closes the handle in the reference
+     *
+     * @param ref The handle reference - ignored if {@code null}
+     * @see #closeHandle(WinNT.HANDLE)
+     */
+    public static void closeHandleRef(HANDLEByReference ref) {
+        closeHandle((ref == null) ? null : ref.getValue());
+    }
+
+    /**
+     * Invokes {@link #closeHandle(WinNT.HANDLE)} on each handle. If an exception
+     * is thrown for a specific handle, then it is accumulated until all
+     * handles have been closed. If more than one exception occurs, then it
+     * is added as a suppressed exception to the first one. Once closed all
+     * handles, the accumulated exception (if any) is thrown
+     *
+     * @param handles The handles to be closed
+     * @see Throwable#getSuppressed()
+     */
+    public static void closeHandles(HANDLE... handles) {
+        Win32Exception err = null;
+        for (HANDLE h : handles) {
+            try {
+                closeHandle(h);
+            } catch(Win32Exception e) {
+                if (err == null) {
+                    err = e;
+                } else {
+                    err.addSuppressedReflected(e);
+                }
+            }
+        }
+
+        if (err != null) {
+            throw err;
+        }
+    }
+
+    /**
+     * Invokes {@link Kernel32#CloseHandle(WinNT.HANDLE)} and checks the success code.
+     * If not successful, then throws a {@link Win32Exception} with the
+     * {@code GetLastError} value
+     *
+     * @param h The handle to be closed - ignored if {@code null}
+     */
+    public static void closeHandle(HANDLE h) {
+        if (h == null) {
+            return;
+        }
+
+        if (!Kernel32.INSTANCE.CloseHandle(h)) {
+            throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
+        }
+    }
+
+    /**
+     * Format a message from the value obtained from
+     * {@link Kernel32#GetLastError()} or {@link Native#getLastError()}.
+     *
+     * @param code The error code
      * @return Formatted message.
      */
     public static String formatMessage(int code) {
         PointerByReference buffer = new PointerByReference();
-        if (0 == Kernel32.INSTANCE.FormatMessage(
+        int nLen = Kernel32.INSTANCE.FormatMessage(
                 WinBase.FORMAT_MESSAGE_ALLOCATE_BUFFER
-                        | WinBase.FORMAT_MESSAGE_FROM_SYSTEM
-                        | WinBase.FORMAT_MESSAGE_IGNORE_INSERTS, null, code, 0, // TODO:
-                                                                                // MAKELANGID(LANG_NEUTRAL,
-                                                                                // SUBLANG_DEFAULT)
-                buffer, 0, null)) {
-            throw new LastErrorException(Kernel32.INSTANCE.GetLastError());
+                | WinBase.FORMAT_MESSAGE_FROM_SYSTEM
+                | WinBase.FORMAT_MESSAGE_IGNORE_INSERTS,
+                null,
+                code,
+                0, // TODO: // MAKELANGID(LANG_NEUTRAL,SUBLANG_DEFAULT)
+                buffer, 0, null);
+        if (nLen == 0) {
+            throw new LastErrorException(Native.getLastError());
         }
-        String s = buffer.getValue().getWideString(0);
-        Kernel32.INSTANCE.LocalFree(buffer.getValue());
-        return s.trim();
+
+        Pointer ptr = buffer.getValue();
+        try {
+            String s = ptr.getWideString(0);
+            return s.trim();
+        } finally {
+            freeLocalMemory(ptr);
+        }
     }
 
     /**
@@ -90,15 +218,6 @@ public abstract class Kernel32Util implements WinDef {
     }
 
     /**
-     * @deprecated use {@link #formatMessage(WinNT.HRESULT)} instead.
-     * @param code error code
-     * @return formatted message
-     */
-    public static String formatMessageFromHR(HRESULT code) {
-        return formatMessage(code.intValue());
-    }
-
-    /**
      * Format a system message from an error code.
      *
      * @param code
@@ -106,7 +225,7 @@ public abstract class Kernel32Util implements WinDef {
      * @return Formatted message.
      */
     public static String formatMessageFromLastErrorCode(int code) {
-        return formatMessageFromHR(W32Errors.HRESULT_FROM_WIN32(code));
+        return formatMessage(W32Errors.HRESULT_FROM_WIN32(code));
     }
 
     /**
@@ -187,6 +306,7 @@ public abstract class Kernel32Util implements WinDef {
         }
 
         HANDLE hFile = null;
+        Win32Exception err = null;
         try {
             hFile = Kernel32.INSTANCE.CreateFile(fileName, WinNT.GENERIC_READ,
                     WinNT.FILE_SHARE_READ, new WinBase.SECURITY_ATTRIBUTES(),
@@ -199,24 +319,35 @@ public abstract class Kernel32Util implements WinDef {
 
             int type = Kernel32.INSTANCE.GetFileType(hFile);
             switch (type) {
-            case WinNT.FILE_TYPE_UNKNOWN:
-                int err = Kernel32.INSTANCE.GetLastError();
-                switch (err) {
-                case WinError.NO_ERROR:
-                    break;
-                default:
-                    throw new Win32Exception(err);
-                }
+                case WinNT.FILE_TYPE_UNKNOWN:
+                    int rc = Kernel32.INSTANCE.GetLastError();
+                    switch (rc) {
+                        case WinError.NO_ERROR:
+                            break;
+                        default:
+                            throw new Win32Exception(rc);
+                    }
                 // fall-thru
 
             default:
                 return type;
             }
+        } catch(Win32Exception e) {
+            err = e;
+            throw err;  // re-throw so finally block executed
         } finally {
-            if (hFile != null) {
-                if (!Kernel32.INSTANCE.CloseHandle(hFile)) {
-                    throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
+            try {
+                closeHandle(hFile);
+            } catch(Win32Exception e) {
+                if (err == null) {
+                    err = e;
+                } else {
+                    err.addSuppressedReflected(e);
                 }
+            }
+
+            if (err != null) {
+                throw err;
             }
         }
     }
@@ -292,7 +423,7 @@ public abstract class Kernel32Util implements WinDef {
         if (lpszEnvironmentBlock == null) {
             return null;
         }
-
+        
         Map<String,String>  vars=new TreeMap<String,String>();
         boolean             asWideChars=isWideCharEnvironmentStringBlock(lpszEnvironmentBlock, offset);
         long                stepFactor=asWideChars ? 2L : 1L;
@@ -680,19 +811,19 @@ public abstract class Kernel32Util implements WinDef {
 
         return volumeGUIDPath.substring(VOLUME_GUID_PATH_PREFIX.length(), volumeGUIDPath.length() - VOLUME_GUID_PATH_SUFFIX.length());
     }
-    
+
     /**
-     * 
+     *
      * This function retrieves the full path of the executable file of a given process.
-     * 
+     *
      * @param hProcess
      *          Handle for the running process
      * @param dwFlags
      *          0 - The name should use the Win32 path format.
-     *          1(WinNT.PROCESS_NAME_NATIVE) - The name should use the native system path format. 
-     * 
-     * @return the full path of the process's executable file of null if failed. To get extended error information, 
-     *         call GetLastError. 
+     *          1(WinNT.PROCESS_NAME_NATIVE) - The name should use the native system path format.
+     *
+     * @return the full path of the process's executable file of null if failed. To get extended error information,
+     *         call GetLastError.
      */
     public static final String QueryFullProcessImageName(HANDLE hProcess, int dwFlags) {
         char[] path = new char[WinDef.MAX_PATH];
@@ -775,7 +906,7 @@ public abstract class Kernel32Util implements WinDef {
                 if (!Kernel32.INSTANCE.FreeLibrary(target)) {
                     Win32Exception we = new Win32Exception(Kernel32.INSTANCE.GetLastError());
                     if (err != null) {
-                        we.addSuppressed(err);
+                        we.addSuppressedReflected(err);
                     }
                     throw we;
                 }
@@ -791,10 +922,10 @@ public abstract class Kernel32Util implements WinDef {
 
     /**
      * Gets a list of all resources from the specified executable file
-     * 
+     *
      * @param path
      *            The path to the executable file
-     * @return A map of resource type name/ID => resources.<br>
+     * @return A map of resource type name/ID =&gt; resources.<br>
      *         A map key + a single list item + the path to the executable can
      *         be handed off to getResource() to actually get the resource.
      */
@@ -813,7 +944,7 @@ public abstract class Kernel32Util implements WinDef {
             @Override
             public boolean invoke(HMODULE module, Pointer type, Pointer lParam) {
                 // simulate IS_INTRESOURCE macro defined in WinUser.h
-                // basically that means that if "type" is less than or equal to 65,535 
+                // basically that means that if "type" is less than or equal to 65,535
                 // it assumes it's an ID.
                 // otherwise it assumes it's a pointer to a string
                 if (Pointer.nativeValue(type) <= 65535) {
@@ -830,13 +961,13 @@ public abstract class Kernel32Util implements WinDef {
             @Override
             public boolean invoke(HMODULE module, Pointer type, Pointer name, Pointer lParam) {
                 String typeName = "";
-                
+
                 if (Pointer.nativeValue(type) <= 65535) {
                     typeName = Pointer.nativeValue(type) + "";
                 } else {
                     typeName = type.getWideString(0);
                 }
-                
+
                 if (Pointer.nativeValue(name) < 65535) {
                     result.get(typeName).add(Pointer.nativeValue(name) + "");
                 } else {
@@ -846,7 +977,7 @@ public abstract class Kernel32Util implements WinDef {
                 return true;
             }
         };
-        
+
 
         Win32Exception err = null;
         try {
@@ -867,7 +998,7 @@ public abstract class Kernel32Util implements WinDef {
                     pointer = new Memory(Native.WCHAR_SIZE * (typeName.length() + 1));
                     pointer.setWideString(0, typeName);
                 }
-                   
+
                 boolean callResult = Kernel32.INSTANCE.EnumResourceNames(target, pointer, ernp, null);
 
                 if (!callResult) {
@@ -883,7 +1014,7 @@ public abstract class Kernel32Util implements WinDef {
                 if (!Kernel32.INSTANCE.FreeLibrary(target)) {
                     Win32Exception we = new Win32Exception(Kernel32.INSTANCE.GetLastError());
                     if (err != null) {
-                        we.addSuppressed(err);
+                        we.addSuppressedReflected(err);
                     }
                     throw we;
                 }
@@ -895,10 +1026,10 @@ public abstract class Kernel32Util implements WinDef {
         }
         return result;
     }
-    
+
     /**
      * Returns all the executable modules for a given process ID.<br>
-     * 
+     *
      * @param processID
      *            The process ID to get executable modules for
      * @return All the modules in the process.
@@ -909,46 +1040,102 @@ public abstract class Kernel32Util implements WinDef {
             throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
         }
 
-        List<Tlhelp32.MODULEENTRY32W> modules = new ArrayList<Tlhelp32.MODULEENTRY32W>();
         Win32Exception we = null;
         try {
             Tlhelp32.MODULEENTRY32W first = new Tlhelp32.MODULEENTRY32W();
-            modules.add(first);
 
             if (!Kernel32.INSTANCE.Module32FirstW(snapshot, first)) {
                 throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
             }
+
+            List<Tlhelp32.MODULEENTRY32W> modules = new ArrayList<Tlhelp32.MODULEENTRY32W>();
+            modules.add(first);
 
             Tlhelp32.MODULEENTRY32W next = new Tlhelp32.MODULEENTRY32W();
             while (Kernel32.INSTANCE.Module32NextW(snapshot, next)) {
                 modules.add(next);
                 next = new Tlhelp32.MODULEENTRY32W();
             }
-            
+
             int lastError = Kernel32.INSTANCE.GetLastError();
-            // if we got a false from Module32Next, 
+            // if we got a false from Module32Next,
             // check to see if it returned false because we're genuinely done
             // or if something went wrong.
             if (lastError != W32Errors.ERROR_SUCCESS && lastError != W32Errors.ERROR_NO_MORE_FILES) {
                 throw new Win32Exception(lastError);
             }
+
+            return modules;
         } catch (Win32Exception e) {
             we = e;
+            throw we;   // re-throw so finally block is executed
         } finally {
-            if (snapshot != null) {
-                if (!Kernel32.INSTANCE.CloseHandle(snapshot)) {
-                    Win32Exception e = new Win32Exception(Kernel32.INSTANCE.GetLastError());
-                    if (we != null) {
-                        e.addSuppressed(we);
-                    }
+            try {
+                closeHandle(snapshot);
+            } catch(Win32Exception e) {
+                if (we == null) {
                     we = e;
+                } else {
+                    we.addSuppressedReflected(e);
                 }
             }
+
+            if (we != null) {
+                throw we;
+            }
+        }
+    }
+    
+    /**
+     * Expands environment-variable strings and replaces them with the values
+     * defined for the current user.
+     * 
+     * @param input A string that contains one or more environment-variable
+     *              strings in the form: %variableName%. For each such
+     *              reference, the %variableName% portion is replaced with the
+     *              current value of that environment variable.
+     *
+     *              <p>Case is ignored when looking up the environment-variable 
+     *              name. If the name is not found, the %variableName% portion 
+     *              is left unexpanded.</p>
+     * 
+     *              <p>Note that this function does not support all the features
+     *              that Cmd.exe supports. For example, it does not support 
+     *              %variableName:str1=str2% or %variableName:~offset,length%.</p>
+     *
+     * @return the replaced string
+     * @throws Win32Exception if an error occurs
+     */
+    public static String expandEnvironmentStrings(String input) {
+        if(input == null) {
+            return "";
         }
         
-        if (we != null) {
-            throw we;
+        int resultChars = Kernel32.INSTANCE.ExpandEnvironmentStrings(input, null, 0);
+        
+        if(resultChars == 0) {
+            throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
         }
-        return modules;
+        
+        Memory resultMemory;
+        if( W32APITypeMapper.DEFAULT == W32APITypeMapper.UNICODE ) {
+            resultMemory = new Memory(resultChars * Native.WCHAR_SIZE);
+        } else {
+            // return value is length in chars including terminating NULL,
+            // documentation for ANSI version says: buffer size should be the
+            // string length, plus terminating null character, plus one
+            resultMemory = new Memory(resultChars + 1);
+        }
+        resultChars = Kernel32.INSTANCE.ExpandEnvironmentStrings(input, resultMemory, resultChars);
+        
+        if(resultChars == 0) {
+            throw new Win32Exception(Kernel32.INSTANCE.GetLastError());
+        }
+        
+        if( W32APITypeMapper.DEFAULT == W32APITypeMapper.UNICODE ) {
+            return resultMemory.getWideString(0);
+        } else {
+            return resultMemory.getString(0);
+        }
     }
 }

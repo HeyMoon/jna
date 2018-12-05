@@ -1,23 +1,32 @@
 /* Copyright (c) 2010 Daniel Doubrovkine, All Rights Reserved
+ *
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
  * 
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
+ * You can freely decide which license you want to apply to 
+ * the project.
  * 
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.  
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
 package com.sun.jna.platform.win32;
-
-import java.util.Arrays;
-import java.util.List;
 
 import com.sun.jna.Platform;
 import com.sun.jna.Pointer;
 import com.sun.jna.Structure;
+import com.sun.jna.Structure.FieldOrder;
 import com.sun.jna.TypeMapper;
 import com.sun.jna.platform.win32.WinDef.DWORD;
 import com.sun.jna.platform.win32.WinDef.HINSTANCE;
@@ -39,12 +48,12 @@ public interface ShellAPI extends StdCallLibrary {
 
     int STRUCTURE_ALIGNMENT = Platform.is64Bit() ? Structure.ALIGN_DEFAULT : Structure.ALIGN_NONE;
     TypeMapper TYPE_MAPPER = Boolean.getBoolean("w32.ascii") ? W32APITypeMapper.ASCII : W32APITypeMapper.UNICODE;
-	
+
     int FO_MOVE = 0x0001;
     int FO_COPY = 0x0002;
     int FO_DELETE = 0x0003;
     int FO_RENAME = 0x0004;
-    
+
     int FOF_MULTIDESTFILES = 0x0001;
     int FOF_CONFIRMMOUSE = 0x0002;
     int FOF_SILENT = 0x0004; // don't display progress UI (confirm prompts may be displayed still)
@@ -62,18 +71,19 @@ public interface ShellAPI extends StdCallLibrary {
     int FOF_WANTNUKEWARNING = 0x4000; // during delete operation, warn if nuking instead of recycling (partially overrides FOF_NOCONFIRMATION)
     int FOF_NORECURSEREPARSE = 0x8000; // deprecated; the operations engine always does the right thing on FolderLink objects (symlinks, reparse points, folder shortcuts)
     int FOF_NO_UI = (FOF_SILENT | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_NOCONFIRMMKDIR); // don't display any UI at all
-	  
+
     int PO_DELETE = 0x0013; // printer is being deleted
     int PO_RENAME = 0x0014; // printer is being renamed
     int PO_PORTCHANGE = 0x0020; // port this printer connected to is being changed
     int PO_REN_PORT = 0x0034; // PO_RENAME and PO_PORTCHANGE at same time.
 
     /**
-     * Contains information that the SHFileOperation function uses to perform file operations. 
+     * Contains information that the SHFileOperation function uses to perform file operations.
      */
+    @FieldOrder({"hwnd", "wFunc", "pFrom", "pTo", "fFlags", "fAnyOperationsAborted", "pNameMappings", "lpszProgressTitle"})
     public static class SHFILEOPSTRUCT extends Structure {
         /**
-         * A window handle to the dialog box to display information about 
+         * A window handle to the dialog box to display information about
          * the status of the file operation.
          */
         public HANDLE hwnd;
@@ -82,7 +92,7 @@ public interface ShellAPI extends StdCallLibrary {
          */
         public int wFunc;
         /**
-         * A pointer to one or more source file names, double null-terminated. 
+         * A pointer to one or more source file names, double null-terminated.
          */
         public String pFrom;
         /**
@@ -94,26 +104,22 @@ public interface ShellAPI extends StdCallLibrary {
          */
         public short fFlags;
         /**
-         * When the function returns, this member contains TRUE if any file operations 
-         * were aborted before they were completed; otherwise, FALSE. An operation can 
-         * be manually aborted by the user through UI or it can be silently aborted by 
+         * When the function returns, this member contains TRUE if any file operations
+         * were aborted before they were completed; otherwise, FALSE. An operation can
+         * be manually aborted by the user through UI or it can be silently aborted by
          * the system if the FOF_NOERRORUI or FOF_NOCONFIRMATION flags were set.
          */
         public boolean fAnyOperationsAborted;
         /**
-         * When the function returns, this member contains a handle to a name mapping 
-         * object that contains the old and new names of the renamed files. This member 
-         * is used only if the fFlags member includes the FOF_WANTMAPPINGHANDLE flag. 
+         * When the function returns, this member contains a handle to a name mapping
+         * object that contains the old and new names of the renamed files. This member
+         * is used only if the fFlags member includes the FOF_WANTMAPPINGHANDLE flag.
          */
         public Pointer pNameMappings;
         /**
-         * A pointer to the title of a progress dialog box. This is a null-terminated string. 
+         * A pointer to the title of a progress dialog box. This is a null-terminated string.
          */
         public String lpszProgressTitle;
-        
-        protected List getFieldOrder() {
-            return Arrays.asList(new String[] { "hwnd", "wFunc", "pFrom", "pTo", "fFlags", "fAnyOperationsAborted", "pNameMappings", "lpszProgressTitle" });
-        }
 
         /** Use this to encode <code>pFrom/pTo</code> paths.
          * @param paths Paths to encode
@@ -127,11 +133,9 @@ public interface ShellAPI extends StdCallLibrary {
             }
             return encoded + "\0";
         }
-        
-        
     }
-    
-    /** 
+
+    /**
      * Appbar message value to send. This parameter can be one of the following
      * values.
      */
@@ -178,15 +182,16 @@ public interface ShellAPI extends StdCallLibrary {
     /** Left edge. */
     int ABE_LEFT = 0;
     /** Top edge. */
-    int ABE_TOP = 1; 
+    int ABE_TOP = 1;
     /** Right edge. */
-    int ABE_RIGHT = 2; 
+    int ABE_RIGHT = 2;
     /** Bottom edge. */
-    int ABE_BOTTOM = 3; 
+    int ABE_BOTTOM = 3;
 
     /**
      * Contains information about a system appbar message.
      */
+    @FieldOrder({"cbSize", "hWnd", "uCallbackMessage", "uEdge",  "rc", "lParam"})
     public static class APPBARDATA extends Structure {
         public static class ByReference extends APPBARDATA implements Structure.ByReference {
         }
@@ -205,11 +210,6 @@ public interface ShellAPI extends StdCallLibrary {
         public APPBARDATA(Pointer p) {
         	super(p);
         }
-
-        @Override
-        protected List getFieldOrder() {
-        	return Arrays.asList("cbSize", "hWnd", "uCallbackMessage", "uEdge",	"rc", "lParam");
-        }
     }
 
 	/**
@@ -218,7 +218,7 @@ public interface ShellAPI extends StdCallLibrary {
 	 * "https://msdn.microsoft.com/en-us/library/windows/desktop/bb762154(v=vs.85).aspx">
 	 * <strong xmlns="http://www.w3.org/1999/xhtml">ShellExecuteEx</strong></a>.
 	 * </p>
-	 * 
+	 *
 	 * <pre>
 	 * <span style="color:Blue;">typedef</span> <span style="color:Blue;">struct</span> _SHELLEXECUTEINFO {
 	 *   DWORD &nbsp;&nbsp;&nbsp;&nbsp;cbSize;
@@ -241,7 +241,7 @@ public interface ShellAPI extends StdCallLibrary {
 	 *   HANDLE &nbsp;&nbsp;&nbsp;hProcess;
 	 * } SHELLEXECUTEINFO, *LPSHELLEXECUTEINFO;
 	 * </pre>
-	 * 
+	 *
 	 * <h2>Remarks</h2>
 	 * <p>
 	 * The <strong>SEE_MASK_NOASYNC</strong> flag must be specified if the
@@ -284,29 +284,20 @@ public interface ShellAPI extends StdCallLibrary {
 	 * enclose each mark in a pair of quotation marks, as in the following
 	 * example.
 	 * </p>
-	 * <div id="code-snippet-2" class="codeSnippetContainer" xmlns=""> <div
-	 * class="codeSnippetContainerTabs"> </div>
-	 * <div class="codeSnippetContainerCodeContainer"> <div class=
-	 * "codeSnippetToolBar"> <div class="codeSnippetToolBarText"> <a name=
-	 * "CodeSnippetCopyLink" style="display: none;" title=
-	 * "Copy to clipboard." href=
-	 * "javascript:if (window.epx.codeSnippet)window.epx.codeSnippet.copyCode('CodeSnippetContainerCode_3de148bb-edf3-4344-8ecf-c211304bfa9e');"
-	 * >Copy</a> </div> </div>
-	 * <div id="CodeSnippetContainerCode_3de148bb-edf3-4344-8ecf-c211304bfa9e"
-	 * class="codeSnippetContainerCode" dir="ltr"> <div style="color:Black;">
-	 * 
+         * <p>
 	 * <pre>
 	 * sei.lpParameters = &quot;An example: \&quot;\&quot;\&quot;quoted text\&quot;\&quot;\&quot;&quot;;
 	 * </pre>
-	 * 
-	 * </div> </div> </div> </div>
+         * </p>
 	 * <p>
 	 * In this case, the application receives three parameters: <em>An</em>,
 	 * <em>example:</em>, and <em>"quoted text"</em>.
 	 * </p>
 	 */
+        @FieldOrder({"cbSize", "fMask", "hwnd", "lpVerb", "lpFile", "lpParameters",
+                "lpDirectory", "nShow", "hInstApp", "lpIDList", "lpClass", "hKeyClass", "dwHotKey", "hMonitor",
+                "hProcess"})
 	public class SHELLEXECUTEINFO extends Structure {
-	
 		/**
 		 * <p>
 		 * Type: <strong>DWORD</strong>
@@ -316,7 +307,7 @@ public interface ShellAPI extends StdCallLibrary {
 		 * </p>
 		 */
 		public int cbSize = size();
-	
+
 		/**
 		 * <p>
 		 * Type: <strong>ULONG</strong>
@@ -611,7 +602,7 @@ public interface ShellAPI extends StdCallLibrary {
 		 * </dl>
 		 */
 		public int fMask;
-	
+
 		/**
 		 * <p>
 		 * Type: <strong>HWND</strong>
@@ -623,7 +614,7 @@ public interface ShellAPI extends StdCallLibrary {
 		 * </p>
 		 */
 		public HWND hwnd;
-	
+
 		/**
 		 * <p>
 		 * Type: <strong>LPCTSTR</strong>
@@ -709,7 +700,7 @@ public interface ShellAPI extends StdCallLibrary {
 		 * </dl>
 		 */
 		public String lpVerb;
-	
+
 		/**
 		 * <p>
 		 * Type: <strong>LPCTSTR</strong>
@@ -737,7 +728,7 @@ public interface ShellAPI extends StdCallLibrary {
 		 * included with the name, the current directory is assumed.</div>
 		 */
 		public String lpFile;
-	
+
 		/**
 		 * <p>
 		 * Type: <strong>LPCTSTR</strong>
@@ -750,7 +741,7 @@ public interface ShellAPI extends StdCallLibrary {
 		 * </p>
 		 */
 		public String lpParameters;
-	
+
 		/**
 		 * <p>
 		 * Type: <strong>LPCTSTR</strong>
@@ -763,7 +754,7 @@ public interface ShellAPI extends StdCallLibrary {
 		 * </p>
 		 */
 		public String lpDirectory;
-	
+
 		/**
 		 * <p>
 		 * Type: <strong>int</strong>
@@ -779,7 +770,7 @@ public interface ShellAPI extends StdCallLibrary {
 		 * </p>
 		 */
 		public int nShow;
-	
+
 		/**
 		 * <p>
 		 * Type: <strong>HINSTANCE</strong>
@@ -907,7 +898,7 @@ public interface ShellAPI extends StdCallLibrary {
 		 * </dl>
 		 */
 		public HINSTANCE hInstApp;
-	
+
 		/**
 		 * <p>
 		 * Type: <strong>LPVOID</strong>
@@ -924,12 +915,12 @@ public interface ShellAPI extends StdCallLibrary {
 		 * </p>
 		 */
 		public Pointer lpIDList;
-	
+
 		/**
 		 * <p>
 		 * Type: <strong>LPCTSTR</strong>
 		 * </p>
-		 * 
+		 *
 		 * <p>
 		 * The address of a null-terminated string that specifies one of the
 		 * following:
@@ -952,7 +943,7 @@ public interface ShellAPI extends StdCallLibrary {
 		 * </p>
 		 */
 		public String lpClass;
-	
+
 		/**
 		 * <p>
 		 * Type: <strong>HKEY</strong>
@@ -965,7 +956,7 @@ public interface ShellAPI extends StdCallLibrary {
 		 * </p>
 		 */
 		public HKEY hKeyClass;
-	
+
 		/**
 		 * <p>
 		 * Type: <strong>DWORD</strong>
@@ -982,14 +973,14 @@ public interface ShellAPI extends StdCallLibrary {
 		 * </p>
 		 */
 		public int dwHotKey;
-	
+
 		/**
 		 * This is actually a union:
-		 * 
+		 *
 		 * <pre>
 		 * <code>union { HANDLE hIcon; HANDLE hMonitor; } DUMMYUNIONNAME;</code>
 		 * </pre>
-		 * 
+		 *
 		 * <strong>DUMMYUNIONNAME</strong>
 		 * <dl>
 		 * <dt><strong>hIcon</strong></dt>
@@ -1022,7 +1013,7 @@ public interface ShellAPI extends StdCallLibrary {
 		 * </dl>
 		 */
 		public HANDLE hMonitor;
-	
+
 		/**
 		 * <p>
 		 * Type: <strong>HANDLE</strong>
@@ -1052,12 +1043,5 @@ public interface ShellAPI extends StdCallLibrary {
 		 * </a>.</div>
 		 */
 		public HANDLE hProcess;
-	
-		protected List getFieldOrder() {
-			return Arrays.asList(new String[] { "cbSize", "fMask", "hwnd", "lpVerb", "lpFile", "lpParameters",
-					"lpDirectory", "nShow", "hInstApp", "lpIDList", "lpClass", "hKeyClass", "dwHotKey", "hMonitor",
-					"hProcess", });
-		}
 	}
-
 }

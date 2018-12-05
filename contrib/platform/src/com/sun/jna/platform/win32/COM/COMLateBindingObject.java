@@ -1,25 +1,33 @@
 /* Copyright (c) 2012 Tobias Wolf, All Rights Reserved
  *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
+ * 
+ * You can freely decide which license you want to apply to 
+ * the project.
+ * 
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
 package com.sun.jna.platform.win32.COM;
 
 import java.util.Date;
 
 import com.sun.jna.platform.win32.Guid.CLSID;
-import com.sun.jna.platform.win32.OaIdl.VARIANT_BOOL;
 import com.sun.jna.platform.win32.OleAuto;
 import com.sun.jna.platform.win32.Variant.VARIANT;
-import com.sun.jna.platform.win32.WinDef.LONG;
-import com.sun.jna.platform.win32.WinDef.SHORT;
 
 // TODO: Auto-generated Javadoc
 /**
@@ -75,8 +83,23 @@ public class COMLateBindingObject extends COMBindingBaseObject {
      */
     protected IDispatch getAutomationProperty(String propertyName) {
         VARIANT.ByReference result = new VARIANT.ByReference();
-        this.oleMethod(OleAuto.DISPATCH_PROPERTYGET, result,
-                this.getIDispatch(), propertyName);
+        this.oleMethod(OleAuto.DISPATCH_PROPERTYGET, result, propertyName);
+
+        return ((IDispatch) result.getValue());
+    }
+
+    /**
+     * Gets the automation property.
+     *
+     * @param propertyName
+     *            the property name
+     * @param value
+     *            parameter to pass to the getter
+     * @return the automation property
+     */
+    protected IDispatch getAutomationProperty(String propertyName, VARIANT value) {
+        VARIANT.ByReference result = new VARIANT.ByReference();
+        this.oleMethod(OleAuto.DISPATCH_PROPERTYGET, result, propertyName, value);
 
         return ((IDispatch) result.getValue());
     }
@@ -89,12 +112,13 @@ public class COMLateBindingObject extends COMBindingBaseObject {
      * @param comObject
      *            the com object
      * @return the automation property
+     * @deprecated Use {@link #getAutomationProperty(java.lang.String)}
      */
+    @Deprecated
     protected IDispatch getAutomationProperty(String propertyName,
             COMLateBindingObject comObject) {
         VARIANT.ByReference result = new VARIANT.ByReference();
-        this.oleMethod(OleAuto.DISPATCH_PROPERTYGET, result,
-                comObject.getIDispatch(), propertyName);
+        this.oleMethod(OleAuto.DISPATCH_PROPERTYGET, result, propertyName);
 
         return ((IDispatch) result.getValue());
     }
@@ -109,12 +133,13 @@ public class COMLateBindingObject extends COMBindingBaseObject {
      * @param value
      *            the value
      * @return the automation property
+     * @deprecated Use {@link #getAutomationProperty(java.lang.String, com.sun.jna.platform.win32.Variant.VARIANT)}
      */
+    @Deprecated
     protected IDispatch getAutomationProperty(String propertyName,
             COMLateBindingObject comObject, VARIANT value) {
         VARIANT.ByReference result = new VARIANT.ByReference();
-        this.oleMethod(OleAuto.DISPATCH_PROPERTYGET, result,
-                comObject.getIDispatch(), propertyName, value);
+        this.oleMethod(OleAuto.DISPATCH_PROPERTYGET, result, propertyName, value);
 
         return ((IDispatch) result.getValue());
     }
@@ -127,12 +152,13 @@ public class COMLateBindingObject extends COMBindingBaseObject {
      * @param iDispatch
      *            the i dispatch
      * @return the automation property
+     * @deprecated Use {@link #getAutomationProperty(java.lang.String)}
      */
+    @Deprecated
     protected IDispatch getAutomationProperty(String propertyName,
             IDispatch iDispatch) {
         VARIANT.ByReference result = new VARIANT.ByReference();
-        this.oleMethod(OleAuto.DISPATCH_PROPERTYGET, result,
-                this.getIDispatch(), propertyName);
+        this.oleMethod(OleAuto.DISPATCH_PROPERTYGET, result, propertyName);
 
         return ((IDispatch) result.getValue());
     }
@@ -146,10 +172,9 @@ public class COMLateBindingObject extends COMBindingBaseObject {
      */
     protected boolean getBooleanProperty(String propertyName) {
         VARIANT.ByReference result = new VARIANT.ByReference();
-        this.oleMethod(OleAuto.DISPATCH_PROPERTYGET, result,
-                this.getIDispatch(), propertyName);
+        this.oleMethod(OleAuto.DISPATCH_PROPERTYGET, result, propertyName);
 
-        return (((VARIANT_BOOL) result.getValue()).intValue() != 0);
+        return result.booleanValue();
     }
 
     /**
@@ -161,8 +186,7 @@ public class COMLateBindingObject extends COMBindingBaseObject {
      */
     protected Date getDateProperty(String propertyName) {
         VARIANT.ByReference result = new VARIANT.ByReference();
-        this.oleMethod(OleAuto.DISPATCH_PROPERTYGET, result,
-                this.getIDispatch(), propertyName);
+        this.oleMethod(OleAuto.DISPATCH_PROPERTYGET, result, propertyName);
 
         return result.dateValue();
     }
@@ -176,10 +200,9 @@ public class COMLateBindingObject extends COMBindingBaseObject {
      */
     protected int getIntProperty(String propertyName) {
         VARIANT.ByReference result = new VARIANT.ByReference();
-        this.oleMethod(OleAuto.DISPATCH_PROPERTYGET, result,
-                this.getIDispatch(), propertyName);
+        this.oleMethod(OleAuto.DISPATCH_PROPERTYGET, result, propertyName);
 
-        return ((LONG) result.getValue()).intValue();
+        return result.intValue();
     }
 
     /**
@@ -191,10 +214,9 @@ public class COMLateBindingObject extends COMBindingBaseObject {
      */
     protected short getShortProperty(String propertyName) {
         VARIANT.ByReference result = new VARIANT.ByReference();
-        this.oleMethod(OleAuto.DISPATCH_PROPERTYGET, result,
-                this.getIDispatch(), propertyName);
+        this.oleMethod(OleAuto.DISPATCH_PROPERTYGET, result, propertyName);
 
-        return ((SHORT) result.getValue()).shortValue();
+        return result.shortValue();
     }
 
     /**
@@ -206,10 +228,13 @@ public class COMLateBindingObject extends COMBindingBaseObject {
      */
     protected String getStringProperty(String propertyName) {
         VARIANT.ByReference result = new VARIANT.ByReference();
-        this.oleMethod(OleAuto.DISPATCH_PROPERTYGET, result,
-                this.getIDispatch(), propertyName);
+        this.oleMethod(OleAuto.DISPATCH_PROPERTYGET, result, propertyName);
 
-        return result.getValue().toString();
+        String res = result.stringValue();
+
+        OleAuto.INSTANCE.VariantClear(result);
+
+        return res;
     }
 
     /**
@@ -221,8 +246,7 @@ public class COMLateBindingObject extends COMBindingBaseObject {
      */
     protected VARIANT invoke(String methodName) {
         VARIANT.ByReference result = new VARIANT.ByReference();
-        this.oleMethod(OleAuto.DISPATCH_METHOD, result, this.getIDispatch(),
-                methodName);
+        this.oleMethod(OleAuto.DISPATCH_METHOD, result, methodName);
 
         return result;
     }
@@ -238,8 +262,7 @@ public class COMLateBindingObject extends COMBindingBaseObject {
      */
     protected VARIANT invoke(String methodName, VARIANT arg) {
         VARIANT.ByReference result = new VARIANT.ByReference();
-        this.oleMethod(OleAuto.DISPATCH_METHOD, result, this.getIDispatch(),
-                methodName, arg);
+        this.oleMethod(OleAuto.DISPATCH_METHOD, result, methodName, arg);
 
         return result;
     }
@@ -255,8 +278,7 @@ public class COMLateBindingObject extends COMBindingBaseObject {
      */
     protected VARIANT invoke(String methodName, VARIANT[] args) {
         VARIANT.ByReference result = new VARIANT.ByReference();
-        this.oleMethod(OleAuto.DISPATCH_METHOD, result, this.getIDispatch(),
-                methodName, args);
+        this.oleMethod(OleAuto.DISPATCH_METHOD, result, methodName, args);
 
         return result;
     }
@@ -315,27 +337,18 @@ public class COMLateBindingObject extends COMBindingBaseObject {
     }
 
     /**
-     * Invoke no reply.
-     * 
-     * @param methodName
-     *            the method name
-     * @param dispatch
-     *            the dispatch
+     * @deprecated Use {@link #invokeNoReply(java.lang.String)}
      */
+    @Deprecated
     protected void invokeNoReply(String methodName, IDispatch dispatch) {
         this.oleMethod(OleAuto.DISPATCH_METHOD, null, dispatch, methodName);
     }
 
     /**
-     * Invoke no reply.
-     * 
-     * @param methodName
-     *            the method name
-     * @param comObject
-     *            the com object
+     * @deprecated Use {@link #invokeNoReply(java.lang.String)}
      */
-    protected void invokeNoReply(String methodName,
-            COMLateBindingObject comObject) {
+    @Deprecated
+    protected void invokeNoReply(String methodName, COMLateBindingObject comObject) {
         this.oleMethod(OleAuto.DISPATCH_METHOD, null, comObject.getIDispatch(),
                 methodName);
     }
@@ -345,34 +358,36 @@ public class COMLateBindingObject extends COMBindingBaseObject {
      * 
      * @param methodName
      *            the method name
-     * @param dispatch
-     *            the dispatch
      * @param arg
      *            the arg
      */
+    protected void invokeNoReply(String methodName, VARIANT arg) {
+        this.oleMethod(OleAuto.DISPATCH_METHOD, null, methodName, arg);
+    }
+
+    /**
+     * @deprecated Use {@link #invokeNoReply(java.lang.String, com.sun.jna.platform.win32.Variant.VARIANT)}
+     */
+    @Deprecated
     protected void invokeNoReply(String methodName, IDispatch dispatch,
             VARIANT arg) {
         this.oleMethod(OleAuto.DISPATCH_METHOD, null, dispatch, methodName, arg);
     }
 
     /**
-     * Invoke no reply.
-     * 
-     * @param methodName
-     *            the method name
-     * @param dispatch
-     *            the dispatch
-     * @param arg1
-     *            the arg1
-     * @param arg2
-     *            the arg2
+     * @deprecated Use {@link #invokeNoReply(java.lang.String, com.sun.jna.platform.win32.Variant.VARIANT[])}
      */
+    @Deprecated
     protected void invokeNoReply(String methodName, IDispatch dispatch,
             VARIANT arg1, VARIANT arg2) {
         this.oleMethod(OleAuto.DISPATCH_METHOD, null, dispatch, methodName,
                 new VARIANT[] { arg1, arg2 });
     }
 
+    /**
+     * @deprecated Use {@link #invokeNoReply(java.lang.String, com.sun.jna.platform.win32.Variant.VARIANT[])}
+     */
+    @Deprecated
     protected void invokeNoReply(String methodName, COMLateBindingObject comObject,
             VARIANT arg1, VARIANT arg2) {
         this.oleMethod(OleAuto.DISPATCH_METHOD, null, comObject.getIDispatch(), methodName,
@@ -380,14 +395,7 @@ public class COMLateBindingObject extends COMBindingBaseObject {
     }
 
     /**
-     * Invoke no reply.
-     * 
-     * @param methodName
-     *            the method name
-     * @param comObject
-     *            the com object
-     * @param arg
-     *            the arg
+     * @deprecated Use {@link #invokeNoReply(java.lang.String, com.sun.jna.platform.win32.Variant.VARIANT)}
      */
     protected void invokeNoReply(String methodName,
             COMLateBindingObject comObject, VARIANT arg) {
@@ -395,16 +403,11 @@ public class COMLateBindingObject extends COMBindingBaseObject {
                 methodName, arg);
     }
 
+
     /**
-     * Invoke no reply.
-     * 
-     * @param methodName
-     *            the method name
-     * @param dispatch
-     *            the dispatch
-     * @param args
-     *            the args
+     * @deprecated Use {@link #invokeNoReply(java.lang.String, com.sun.jna.platform.win32.Variant.VARIANT[])}
      */
+    @Deprecated
     protected void invokeNoReply(String methodName, IDispatch dispatch,
             VARIANT[] args) {
         this.oleMethod(OleAuto.DISPATCH_METHOD, null, dispatch, methodName,
@@ -419,22 +422,7 @@ public class COMLateBindingObject extends COMBindingBaseObject {
      */
     protected void invokeNoReply(String methodName) {
         VARIANT.ByReference result = new VARIANT.ByReference();
-        this.oleMethod(OleAuto.DISPATCH_METHOD, result, this.getIDispatch(),
-                methodName);
-    }
-
-    /**
-     * Invoke no reply.
-     * 
-     * @param methodName
-     *            the method name
-     * @param arg
-     *            the arg
-     */
-    protected void invokeNoReply(String methodName, VARIANT arg) {
-        VARIANT.ByReference result = new VARIANT.ByReference();
-        this.oleMethod(OleAuto.DISPATCH_METHOD, result, this.getIDispatch(),
-                methodName, arg);
+        this.oleMethod(OleAuto.DISPATCH_METHOD, result, methodName);
     }
 
     /**
@@ -447,8 +435,7 @@ public class COMLateBindingObject extends COMBindingBaseObject {
      */
     protected void invokeNoReply(String methodName, VARIANT[] args) {
         VARIANT.ByReference result = new VARIANT.ByReference();
-        this.oleMethod(OleAuto.DISPATCH_METHOD, result, this.getIDispatch(),
-                methodName, args);
+        this.oleMethod(OleAuto.DISPATCH_METHOD, result, methodName, args);
     }
 
     /**
@@ -510,8 +497,7 @@ public class COMLateBindingObject extends COMBindingBaseObject {
      *            the value
      */
     protected void setProperty(String propertyName, boolean value) {
-        this.oleMethod(OleAuto.DISPATCH_PROPERTYPUT, null, this.getIDispatch(),
-                propertyName, new VARIANT(value));
+        this.oleMethod(OleAuto.DISPATCH_PROPERTYPUT, null, propertyName, new VARIANT(value));
     }
 
     /**
@@ -523,8 +509,7 @@ public class COMLateBindingObject extends COMBindingBaseObject {
      *            the value
      */
     protected void setProperty(String propertyName, Date value) {
-        this.oleMethod(OleAuto.DISPATCH_PROPERTYPUT, null, this.getIDispatch(),
-                propertyName, new VARIANT(value));
+        this.oleMethod(OleAuto.DISPATCH_PROPERTYPUT, null, propertyName, new VARIANT(value));
     }
 
     /**
@@ -535,9 +520,16 @@ public class COMLateBindingObject extends COMBindingBaseObject {
      * @param value
      *            the value
      */
+    protected void setProperty(String propertyName, Dispatch value) {
+        this.oleMethod(OleAuto.DISPATCH_PROPERTYPUT, null, propertyName, new VARIANT(value));
+    }
+
+    /**
+     * @deprecated Use {@link #setProperty(java.lang.String, com.sun.jna.platform.win32.COM.Dispatch)}
+     */
+    @Deprecated
     protected void setProperty(String propertyName, IDispatch value) {
-        this.oleMethod(OleAuto.DISPATCH_PROPERTYPUT, null, this.getIDispatch(),
-                propertyName, new VARIANT(value));
+        this.oleMethod(OleAuto.DISPATCH_PROPERTYPUT, null, propertyName, new VARIANT(value));
     }
 
     /**
@@ -549,8 +541,7 @@ public class COMLateBindingObject extends COMBindingBaseObject {
      *            the value
      */
     protected void setProperty(String propertyName, int value) {
-        this.oleMethod(OleAuto.DISPATCH_PROPERTYPUT, null, this.getIDispatch(),
-                propertyName, new VARIANT(value));
+        this.oleMethod(OleAuto.DISPATCH_PROPERTYPUT, null, propertyName, new VARIANT(value));
     }
 
     /**
@@ -562,8 +553,7 @@ public class COMLateBindingObject extends COMBindingBaseObject {
      *            the value
      */
     protected void setProperty(String propertyName, short value) {
-        this.oleMethod(OleAuto.DISPATCH_PROPERTYPUT, null, this.getIDispatch(),
-                propertyName, new VARIANT(value));
+        this.oleMethod(OleAuto.DISPATCH_PROPERTYPUT, null, propertyName, new VARIANT(value));
     }
 
     /**
@@ -575,8 +565,7 @@ public class COMLateBindingObject extends COMBindingBaseObject {
      *            the value
      */
     protected void setProperty(String propertyName, String value) {
-        this.oleMethod(OleAuto.DISPATCH_PROPERTYPUT, null, this.getIDispatch(),
-                propertyName, new VARIANT(value));
+        this.oleMethod(OleAuto.DISPATCH_PROPERTYPUT, null, propertyName, new VARIANT(value));
     }
 
     /**
@@ -584,11 +573,17 @@ public class COMLateBindingObject extends COMBindingBaseObject {
      * 
      * @param propertyName
      *            the property name
-     * @param iDispatch
-     *            the i dispatch
      * @param value
      *            the value
      */
+    protected void setProperty(String propertyName, VARIANT value) {
+        this.oleMethod(OleAuto.DISPATCH_PROPERTYPUT, null, propertyName, value);
+    }
+
+    /**
+     * @deprecated Use {@link #setProperty(java.lang.String, com.sun.jna.platform.win32.Variant.VARIANT)}
+     */
+    @Deprecated
     protected void setProperty(String propertyName, IDispatch iDispatch,
             VARIANT value) {
         this.oleMethod(OleAuto.DISPATCH_PROPERTYPUT, null, iDispatch,
@@ -596,15 +591,9 @@ public class COMLateBindingObject extends COMBindingBaseObject {
     }
 
     /**
-     * Sets the property.
-     * 
-     * @param propertyName
-     *            the property name
-     * @param comObject
-     *            the com object
-     * @param value
-     *            the value
+     * @deprecated Use {@link #setProperty(java.lang.String, com.sun.jna.platform.win32.Variant.VARIANT)}
      */
+    @Deprecated
     protected void setProperty(String propertyName,
             COMLateBindingObject comObject, VARIANT value) {
         this.oleMethod(OleAuto.DISPATCH_PROPERTYPUT, null,

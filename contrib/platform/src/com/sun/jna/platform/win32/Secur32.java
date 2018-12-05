@@ -1,19 +1,31 @@
 /* Copyright (c) 2010 Daniel Doubrovkine, All Rights Reserved
  * 
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
  * 
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.  
+ * You can freely decide which license you want to apply to 
+ * the project.
+ * 
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
 package com.sun.jna.platform.win32;
 
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
+import com.sun.jna.Structure;
 import com.sun.jna.platform.win32.Sspi.CredHandle;
 import com.sun.jna.platform.win32.Sspi.CtxtHandle;
 import com.sun.jna.platform.win32.Sspi.PSecPkgInfo;
@@ -30,7 +42,7 @@ import com.sun.jna.win32.W32APIOptions;
  * @author dblock[at]dblock.org
  */
 public interface Secur32 extends StdCallLibrary {
-    Secur32 INSTANCE = Native.loadLibrary("Secur32", Secur32.class, W32APIOptions.DEFAULT_OPTIONS);
+    Secur32 INSTANCE = Native.load("Secur32", Secur32.class, W32APIOptions.DEFAULT_OPTIONS);
 	
     /**
      * Specifies a format for a directory service object name.
@@ -78,8 +90,8 @@ public interface Secur32 extends StdCallLibrary {
      * @param pAuthData
      *  A pointer to package-specific data. This parameter can be NULL, which indicates 
      *  that the default credentials for that package must be used. To use supplied 
-     *  credentials, pass a SEC_WINNT_AUTH_IDENTITY structure that includes those credentials 
-     *  in this parameter.
+     *  credentials, pass a {@link com.sun.jna.platform.win32.Sspi.SEC_WINNT_AUTH_IDENTITY} 
+     *  structure that includes those credentials in this parameter.
      * @param pGetKeyFn
      *  This parameter is not used and should be set to NULL. 
      * @param pvGetKeyArgument
@@ -99,6 +111,7 @@ public interface Secur32 extends StdCallLibrary {
                                         Pointer pAuthData, Pointer pGetKeyFn, // TODO: SEC_GET_KEY_FN
                                         Pointer pvGetKeyArgument, CredHandle phCredential, 
                                         TimeStamp ptsExpiry);
+
 	
     /**
      * The InitializeSecurityContext function initiates the client side, outbound security 
@@ -166,7 +179,7 @@ public interface Secur32 extends StdCallLibrary {
                                          int TargetDataRep, SecBufferDesc pInput, int Reserved2,
                                          CtxtHandle phNewContext, SecBufferDesc pOutput, IntByReference pfContextAttr,
                                          TimeStamp ptsExpiry);
-	
+    
     /**
      * The DeleteSecurityContext function deletes the local data structures associated 
      * with the specified security context.
@@ -192,7 +205,7 @@ public interface Secur32 extends StdCallLibrary {
      *  If the function fails, the return value is SEC_E_INVALID_HANDLE;
      */
     int FreeCredentialsHandle(CredHandle phCredential);
-	
+
     /**
      * The AcceptSecurityContext function enables the server component of a transport 
      * application to establish a security context between the server and a remote client.
@@ -239,6 +252,36 @@ public interface Secur32 extends StdCallLibrary {
                                      SecBufferDesc pInput, int fContextReq, int TargetDataRep,
                                      CtxtHandle phNewContext, SecBufferDesc pOutput, IntByReference pfContextAttr,
                                      TimeStamp ptsTimeStamp);
+
+    /**
+     * The CompleteAuthToken function completes an authentication token. This
+     * function is used by protocols, such as DCE, that need to revise the
+     * security information after the transport application has updated some
+     * message parameters.
+     * <p>
+     * This function is supported only by the Digest security support provider
+     * (SSP).</p>
+     * <p>
+     * CompleteAuthToken is used on the server side only.</p>
+     *
+     * @param phContext A handle of the context that needs to be completed.
+     * @param pToken    A {@link Sspi.SecBufferDesc} structure that contains the
+     *                  buffer descriptor for the entire message.
+     *
+     * @return If the function succeeds, the function returns SEC_E_OK.
+     *
+     * <p>
+     * If the function fails, it returns one of the following error codes.</p>
+     * <table>
+     * <tr><th>Return code</th><th>Description</th></tr>
+     * <tr><td>SEC_E_INVALID_HANDLE</td><td>The handle that was passed to the function is not valid.</td></tr>
+     * <tr><td>SEC_E_INVALID_TOKEN</td><td>The token that was passed to the function is not valid.</td></tr>
+     * <tr><td>SEC_E_OUT_OF_SEQUENCE</td><td>The client's security context was located, but the message number is incorrect. This return value is used with the Digest SSP.</td></tr>
+     * <tr><td>SEC_E_MESSAGE_ALTERED</td><td>The client's security context was located, but the client's message has been tampered with. This return value is used with the Digest SSP.</td></tr>
+     * <tr><td>SEC_E_INTERNAL_ERROR</td><td>An error occurred that did not map to an SSPI error code.</td></tr>
+     * </table>
+     */
+    int CompleteAuthToken(CtxtHandle phContext, SecBufferDesc pToken);
 
     /**
      * The EnumerateSecurityPackages function returns an array of SecPkgInfo structures that 
@@ -308,4 +351,303 @@ public interface Secur32 extends StdCallLibrary {
      *  If the function fails, the return value can be either SEC_E_INVALID_HANDLE or SEC_E_UNSUPPORTED_FUNCTION.
      */
     int RevertSecurityContext(CtxtHandle phContext);
+	
+    /**
+     * Enables a transport application to query a security package for certain
+     * attributes of a security context.
+     * 
+     * @param phContext
+     *  A handle to the security context to be queried.
+     * @param ulAttribute
+     *  Specifies the attribute of the context to be returned. This
+     *  parameter can be one of the SECPKG_ATTR_* values defined in
+     *  {@link Sspi}.
+     * @param pBuffer
+     *  A pointer to a structure that receives the attributes. The
+     *  type of structure pointed to depends on the value specified in
+     *  the ulAttribute parameter.
+     * @return
+     *  If the function succeeds, the return value is SEC_E_OK.
+     *  If the function fails, the return value is a nonzero error code.
+     */
+    int QueryContextAttributes(CtxtHandle phContext, int ulAttribute, Structure pBuffer);
+    
+    /**
+     * Retrieves the attributes of a credential, such as the name associated
+     * with the credential. The information is valid for any security context
+     * created with the specified credential.
+     *
+     * @param phCredential A handle of the credentials to be queried.
+     * @param ulAttribute Specifies the attribute of the context to be returned.
+     *                    This parameter can be one of the SECPKG_ATTR_* values
+     *                    defined in {@link Sspi}.
+     * @param pBuffer     A pointer to a structure that receives the attributes.
+     *                    The type of structure pointed to depends on the value
+     *                    specified in the ulAttribute parameter.
+     * @return If the function succeeds, the return value is SEC_E_OK. If the
+     *         function fails, the return value is a nonzero error code.
+     */
+    int QueryCredentialsAttributes(Sspi.CredHandle phCredential, int ulAttribute, Structure pBuffer);
+    
+    /**
+     * Retrieves information about a specified security package. This
+     * information includes the bounds on sizes of authentication information,
+     * credentials, and contexts.
+     *
+     * @param pszPackageName Name of the security package.
+     * @param ppPackageInfo  Variable that receives a pointer to a SecPkgInfo
+     *                       structure containing information about the
+     *                       specified security package.
+     * @return  If the function succeeds, the return value is SEC_E_OK.
+     * If the function fails, the return value is a nonzero error code.
+     */
+    int QuerySecurityPackageInfo(String pszPackageName, Sspi.PSecPkgInfo ppPackageInfo);
+    
+    /**
+     * EncryptMessage (Kerberos) function
+     * 
+     * <p>
+     * The EncryptMessage (Kerberos) function encrypts a message to provide
+     * privacy. EncryptMessage (Kerberos) allows an application to choose among
+     * cryptographic algorithms supported by the chosen mechanism. The
+     * EncryptMessage (Kerberos) function uses the security context referenced
+     * by the context handle. Some packages do not have messages to be encrypted
+     * or decrypted but rather provide an integrity hash that can be
+     * checked.</p>
+     *
+     * @param phContext A handle to the security context to be used to encrypt
+     *                  the message.
+     * @param fQOP      Package-specific flags that indicate the quality of
+     *                  protection. A security package can use this parameter to
+     *                  enable the selection of cryptographic algorithms. This
+     *                  parameter can be the following flag:
+     *                  {@link Sspi#SECQOP_WRAP_NO_ENCRYPT}.
+     * @param pMessage  A pointer to a SecBufferDesc structure. On input, the
+     *                  structure references one or more SecBuffer structures
+     *                  that can be of type SECBUFFER_DATA. That buffer contains
+     *                  the message to be encrypted. The message is encrypted in
+     *                  place, overwriting the original contents of the
+     *                  structure.
+     *
+     * <p>
+     * The function does not process buffers with the SECBUFFER_READONLY
+     * attribute.</p>
+     *
+     * <p>
+     * The length of the SecBuffer structure that contains the message must be
+     * no greater than cbMaximumMessage, which is obtained from the
+     * QueryContextAttributes (Kerberos) (SECPKG_ATTR_STREAM_SIZES)
+     * function.</p>
+     *
+     * <p>
+     * Applications that do not use SSL must supply a SecBuffer of type
+     * SECBUFFER_PADDING.</p>
+     * @param MessageSeqNo The sequence number that the transport application
+     *                     assigned to the message. If the transport application
+     *                     does not maintain sequence numbers, this parameter
+     *                     must be zero.
+     * @return If the function succeeds, the function returns SEC_E_OK.
+     * @see <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/aa375385(v=vs.85).aspx">MSDN Entry</a>
+     */
+    int EncryptMessage(CtxtHandle phContext, int fQOP, SecBufferDesc pMessage, int MessageSeqNo);
+    
+    /**
+     * VerifySignature function.
+     *
+     * <p>
+     * Verifies that a message signed by using the MakeSignature function was
+     * received in the correct sequence and has not been modified.</p>
+     *
+     * <p>
+     * <strong>Warning</strong></p>
+     *
+     * <p>
+     * The VerifySignature function will fail if the message was signed using
+     * the RsaSignPssSha512 algorithm on a different version of Windows. For
+     * example, a message that was signed by calling the MakeSignature function
+     * on Windows 8 will cause the VerifySignature function on Windows 8.1 to
+     * fail.</p>
+     *
+     * @param phContext    A handle to the security context to use for the
+     *                     message.
+     * @param pMessage     Pointer to a SecBufferDesc structure that references
+     *                     a set of SecBuffer structures that contain the
+     *                     message and signature to verify. The signature is in
+     *                     a SecBuffer structure of type SECBUFFER_TOKEN.
+     * @param MessageSeqNo Specifies the sequence number expected by the
+     *                     transport application, if any. If the transport
+     *                     application does not maintain sequence numbers, this
+     *                     parameter is zero.
+     * @param pfQOP        Pointer to a ULONG variable that receives
+     *                     package-specific flags that indicate the quality of
+     *                     protection.
+     *
+     *                      <p>Some security packages ignore this parameter.</p>
+     *
+     * @return If the function verifies that the message was received in the
+     *         correct sequence and has not been modified, the return value is
+     *         SEC_E_OK.
+     *
+     * <p>
+     * If the function determines that the message is not correct according to
+     * the information in the signature, the return value can be one of the
+     * following error codes.</p>
+     * 
+     * <table>
+     * <tr><th>Return code</th><th>Description</th></tr>
+     * <tr><td>SEC_E_OUT_OF_SEQUENCE</td><td>The message was not received in the
+     * correct sequence.</td></tr>
+     * <tr><td>SEC_E_MESSAGE_ALTERED</td><td>The message has been
+     * altered.</td></tr>
+     * <tr><td>SEC_E_INVALID_HANDLE</td><td>The context handle specified by
+     * phContext is not valid.</td></tr>
+     * <tr><td>SEC_E_INVALID_TOKEN</td><td>pMessage did not contain a valid
+     * SECBUFFER_TOKEN buffer, or contained too few buffers.</td></tr>
+     * <tr><td>SEC_E_QOP_NOT_SUPPORTED</td><td>The quality of protection
+     * negotiated between the client and server did not include integrity
+     * checking.</td></tr>
+     * </table>
+     */
+    int VerifySignature(CtxtHandle phContext, SecBufferDesc pMessage, int MessageSeqNo, IntByReference pfQOP);
+    
+    /**
+     * MakeSignature function.
+     * 
+     * <p>
+     * The MakeSignature function generates a cryptographic checksum of the
+     * message, and also includes sequencing information to prevent message loss
+     * or insertion. MakeSignature allows the application to choose between
+     * several cryptographic algorithms, if supported by the chosen mechanism.
+     * The MakeSignature function uses the security context referenced by the
+     * context handle.</p>
+     *
+     * <p>
+     * <strong>Remarks</strong></p>
+     *
+     * <p>
+     * Remarks</p>
+     *<p>
+     * The MakeSignature function generates a signature that is based on the
+     * message and the session key for the context.</p>
+     *<p>
+     * The VerifySignature function verifies the messages signed by the
+     * MakeSignature function.</p>
+     *<p>
+     * If the transport application created the security context to support
+     * sequence detection and the caller provides a sequence number, the
+     * function includes this information in the signature. This protects
+     * against reply, insertion, and suppression of messages. The security
+     * package incorporates the sequence number passed down from the transport
+     * application.</p>
+     *
+     * @param phContext    A handle to the security context to use to sign the
+     *                     message.
+     * @param fQOP         Package-specific flags that indicate the quality of
+     *                     protection. A security package can use this parameter
+     *                     to enable the selection of cryptographic algorithms.
+     * <p>
+     * When using the Digest SSP, this parameter must be set to zero.</p>
+     *
+     * @param pMessage     A pointer to a SecBufferDesc structure. On input, the
+     *                     structure references one or more SecBuffer structures
+     *                     that contain the message to be signed. The function
+     *                     does not process buffers with the
+     *                     SECBUFFER_READONLY_WITH_CHECKSUM attribute.
+     *
+     * <p>
+     * The SecBufferDesc structure also references a SecBuffer structure of type
+     * SECBUFFER_TOKEN that receives the signature.</p>
+     * <p>
+     * When the Digest SSP is used as an HTTP authentication protocol, the
+     * buffers should be configured as follows.</p>
+     * <table>
+     * <tr><th>Buffer #/buffer type</th><th>Meaning</th></tr>
+     * <tr><td>0 / SECBUFFER_TOKEN</td><td>Empty.</td></tr>
+     * <tr><td>1 / SECBUFFER_PKG_PARAMS</td><td>Method.</td></tr>
+     * <tr><td>2 / SECBUFFER_PKG_PARAMS</td><td>URL.</td></tr>
+     * <tr><td>3 / SECBUFFER_PKG_PARAMS</td><td>HEntity. For more information,
+     * see Input Buffers for the Digest Challenge Response.</td></tr>
+     * <tr><td>4 / SECBUFFER_PADDING</td><td>Empty. Receives the
+     * signature.</td></tr>
+     * </table>
+     *<p>
+     * When the Digest SSP is used as an SASL mechanism, the buffers should be
+     * configured as follows.</p>
+     *<table>
+     * <tr><th>Buffer #/buffer type</th><th>Meaning</th></tr>
+     * <tr><td>0 / SECBUFFER_TOKEN</td><td>Empty. Receives the signature. This
+     * buffer must be large enough to hold the largest possible signature.
+     * Determine the size required by calling the QueryContextAttributes
+     * (General) function and specifying SECPKG_ATTR_SIZES. Check the returned
+     * SecPkgContext_Sizes structure member cbMaxSignature.</td></tr>
+     * <tr><td>1 / SECBUFFER_DATA</td><td>Message to be signed.</td></tr>
+     * <tr><td>2 / SECBUFFER_PADDING</td><td>Empty.</td></tr>
+     * </table>
+     * @param MessageSeqNo      *
+     *                     The sequence number that the transport application
+     *                     assigned to the message. If the transport application
+     *                     does not maintain sequence numbers, this parameter is
+     *                     zero.
+     *
+     * <p>
+     * When using the Digest SSP, this parameter must be set to zero. The Digest
+     * SSP manages sequence numbering internally.</p>
+     *
+     * @return If the function succeeds, the function returns SEC_E_OK.
+     *
+     * <p>
+     * If the function fails, it returns one of the following error codes.</p>
+     *
+     * <table>
+     * <tr><th>Return code</th><th>Description</th>
+     * <tr><td>SEC_I_RENEGOTIATE</td><td>The remote party requires a new
+     * handshake sequence or the application has just initiated a shutdown.
+     * Return to the negotiation loop and call AcceptSecurityContext (General)
+     * or InitializeSecurityContext (General) again. An empty input buffer is
+     * passed in the first call.</td></tr>
+     * <tr><td>SEC_E_INVALID_HANDLE</td><td>The context handle specified by
+     * phContext is not valid.</td></tr>
+     * <tr><td>SEC_E_INVALID_TOKEN</td><td>pMessage did not contain a valid
+     * SECBUFFER_TOKEN buffer or contained too few buffers.</td></tr>
+     * <tr><td>SEC_E_OUT_OF_SEQUENCE</td><td>The nonce count is out of
+     * sequence.</td></tr>
+     * <tr><td>SEC_E_NO_AUTHENTICATING_AUTHORITY</td><td>The security context
+     * (phContext) must be revalidated.</td></tr>
+     * <tr><td>STATUS_INVALID_PARAMETER</td><td>The nonce count is not
+     * numeric.</td></tr>
+     * <tr><td>SEC_E_QOP_NOT_SUPPORTED</td><td>The quality of protection
+     * negotiated between the client and server did not include integrity
+     * checking.</td></tr>
+     * </table>
+     */
+    int MakeSignature(CtxtHandle phContext, int fQOP, SecBufferDesc pMessage, int MessageSeqNo);
+    
+    /**
+     * DecryptMessage (Kerberos) function
+     *
+     * <p>
+     * The DecryptMessage (Kerberos) function decrypts a message. Some packages
+     * do not encrypt and decrypt messages but rather perform and check an
+     * integrity hash.</p>
+     *
+     * @param phContext    A handle to the security context to be used to
+     *                     encrypt the message.
+     * @param pMessage     A pointer to a SecBufferDesc structure. On input, the
+     *                     structure references one or more SecBuffer structures
+     *                     that may be of type SECBUFFER_DATA. The buffer
+     *                     contains the encrypted message. The encrypted message
+     *                     is decrypted in place, overwriting the original
+     *                     contents of its buffer.
+     * @param MessageSeqNo The sequence number expected by the transport
+     *                     application, if any. If the transport application
+     *                     does not maintain sequence numbers, this parameter
+     *                     must be set to zero.
+     * @param pfQOP        A pointer to a variable of type ULONG that receives
+     *                     package-specific flags that indicate the quality of
+     *                     protection. This parameter can be the following flag:
+     *                     {@link Sspi#SECQOP_WRAP_NO_ENCRYPT}.
+     * @return If the function verifies that the message was received in the correct sequence, the function returns SEC_E_OK.
+     * @see <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/aa375385(v=vs.85).aspx">MSDN Entry</a>
+     */
+    int DecryptMessage(CtxtHandle phContext, SecBufferDesc pMessage, int MessageSeqNo, IntByReference pfQOP);
 }

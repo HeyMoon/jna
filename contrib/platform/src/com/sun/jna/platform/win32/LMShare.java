@@ -1,23 +1,34 @@
 /* Copyright (c) 2015 Adam Marcionek, All Rights Reserved
+ *
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
  * 
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
+ * You can freely decide which license you want to apply to 
+ * the project.
  * 
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.  
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
 package com.sun.jna.platform.win32;
 
-import java.util.Arrays;
 import java.util.List;
 
 import com.sun.jna.Pointer;
 import com.sun.jna.Structure;
-import com.sun.jna.win32.StdCallLibrary;
+import com.sun.jna.Structure.FieldOrder;
+import com.sun.jna.win32.W32APITypeMapper;
 
 /**
  * Ported from LMShare.h.
@@ -64,16 +75,9 @@ public interface LMShare {
     /**
      * Contains information about the shared resource, including name of the resource, type and permissions, number of connections, and other pertinent information.
      */
-    public static class SHARE_INFO_2  extends Structure {
-        public SHARE_INFO_2() {
-            super();
-        }
-
-        public SHARE_INFO_2(Pointer memory) {
-            super(memory);
-            read();
-        }
-
+    @FieldOrder({"shi2_netname", "shi2_type", "shi2_remark", "shi2_permissions",
+        "shi2_max_uses", "shi2_current_uses", "shi2_path", "shi2_passwd"})
+    public static class SHARE_INFO_2 extends Structure {
         /**
          * Pointer to a Unicode string specifying the name of a shared resource. Calls to the NetShareSetInfo function ignore this member.
          */
@@ -123,32 +127,25 @@ public interface LMShare {
          * This member can be no longer than SHPWLEN+1 bytes (including a terminating null character). Calls to the NetShareSetInfo function ignore this member.
          */
         public String shi2_passwd;
-        
-        protected List getFieldOrder() {
-            return Arrays.asList(new String[] { "shi2_netname",
-                                                "shi2_type",
-                                                "shi2_remark",
-                                                "shi2_permissions",
-                                                "shi2_max_uses",
-                                                "shi2_current_uses",
-                                                "shi2_path",
-                                                "shi2_passwd" });
+
+        public SHARE_INFO_2() {
+            super(W32APITypeMapper.UNICODE);
+        }
+
+        public SHARE_INFO_2(Pointer memory) {
+            super(memory, Structure.ALIGN_DEFAULT, W32APITypeMapper.UNICODE);
+            read();
         }
     }
 
     /**
      * Contains information about the shared resource, including name of the resource, type and permissions, number of connections, and other pertinent information.
      */
+    @FieldOrder({"shi502_netname", "shi502_type", "shi502_remark",
+        "shi502_permissions", "shi502_max_uses", "shi502_current_uses",
+        "shi502_path", "shi502_passwd", "shi502_reserved",
+        "shi502_security_descriptor"})
     public static class SHARE_INFO_502 extends Structure {
-        public SHARE_INFO_502() {
-            super();
-        }
-
-        public SHARE_INFO_502(Pointer memory) {
-            super(memory);
-            read();
-        }
-
         /**
          * Pointer to a Unicode string specifying the name of a shared resource. Calls to the NetShareSetInfo function ignore this member.
          */
@@ -209,17 +206,13 @@ public interface LMShare {
          */
         public Pointer shi502_security_descriptor;
 
-        protected List getFieldOrder() {
-            return Arrays.asList(new String[] { "shi502_netname",
-                                                "shi502_type",
-                                                "shi502_remark",
-                                                "shi502_permissions",
-                                                "shi502_max_uses",
-                                                "shi502_current_uses",
-                                                "shi502_path",
-                                                "shi502_passwd",
-                                                "shi502_reserved",
-                                                "shi502_security_descriptor" });
+        public SHARE_INFO_502() {
+            super(W32APITypeMapper.UNICODE);
         }
-    }    
+
+        public SHARE_INFO_502(Pointer memory) {
+            super(memory, Structure.ALIGN_DEFAULT, W32APITypeMapper.UNICODE);
+            read();
+        }
+    }
 }

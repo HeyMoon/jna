@@ -23,6 +23,8 @@ import org.junit.Test;
 import com.sun.jna.Native;
 import com.sun.jna.platform.win32.Pdh.PDH_COUNTER_PATH_ELEMENTS;
 import com.sun.jna.platform.win32.Pdh.PDH_RAW_COUNTER;
+import com.sun.jna.platform.win32.PdhUtil.PdhEnumObjectItems;
+import com.sun.jna.platform.win32.PdhUtil.PdhException;
 import com.sun.jna.platform.win32.WinDef.DWORD;
 import com.sun.jna.platform.win32.WinDef.DWORDByReference;
 import com.sun.jna.platform.win32.WinNT.HANDLE;
@@ -48,7 +50,7 @@ public class PdhTest extends AbstractWin32TestSupport {
         HANDLE hQuery = ref.getValue();
         try {
             ref.setValue(null);
-            assertErrorSuccess("PdhAddCounter", pdh.PdhAddCounter(hQuery, counterName, null, ref), true);
+            assertErrorSuccess("PdhAddEnglishCounter", pdh.PdhAddEnglishCounter(hQuery, counterName, null, ref), true);
             
             HANDLE hCounter = ref.getValue();
             try {
@@ -93,7 +95,7 @@ public class PdhTest extends AbstractWin32TestSupport {
             try {
                 for (String counterName : names) {
                     ref.setValue(null);
-                    assertErrorSuccess("PdhAddCounter[" + counterName + "]", pdh.PdhAddCounter(hQuery, counterName, null, ref), true);
+                    assertErrorSuccess("PdhAddCounter[" + counterName + "]", pdh.PdhAddEnglishCounter(hQuery, counterName, null, ref), true);
 
                     HANDLE hCounter = ref.getValue();
                     handlesMap.put(counterName, hCounter);
@@ -154,5 +156,59 @@ public class PdhTest extends AbstractWin32TestSupport {
         assertErrorSuccess("PdhMakeCounterPath", pdh.PdhMakeCounterPath(pathElements, szFullPathBuffer,  pcchBufferSize, 0), true);
         
         return Native.toString(szFullPathBuffer);
+    }
+    
+    @Test
+    public void testLookupPerfIndex() {
+        int processorIndex = 238;
+        String processorStr = "Processor"; // English locale
+
+        // Test index-to-name
+        String testStr = PdhUtil.PdhLookupPerfNameByIndex(null, processorIndex);
+        if (AbstractWin32TestSupport.isEnglishLocale) {
+            assertEquals(processorStr, testStr);
+        } else {
+            assertTrue(testStr.length() > 0);
+        }
+
+        // Test name-to-index
+        DWORDByReference pdwIndex = new DWORDByReference();
+        Pdh.INSTANCE.PdhLookupPerfIndexByName(null, testStr, pdwIndex);
+        assertEquals(processorIndex, pdwIndex.getValue().intValue());
+        
+        // Test English name to index
+        assertEquals(processorIndex, PdhUtil.PdhLookupPerfIndexByEnglishName(processorStr));
+    }
+
+    @Test
+    public void testEnumObjectItems() {
+        if (AbstractWin32TestSupport.isEnglishLocale) {
+            String processorStr = "Processor";
+            String processorTimeStr = "% Processor Time";
+
+            // Fetch the counter and instance names
+            PdhEnumObjectItems objects = PdhUtil.PdhEnumObjectItems(null, null, processorStr, 100);
+
+            assertTrue(objects.getInstances().contains("0"));
+            assertTrue(objects.getInstances().contains("_Total"));
+
+            // Should have a "% Processor Time" counter
+            assertTrue(objects.getCounters().contains(processorTimeStr));
+        } else {
+            System.err.println("testEnumObjectItems test can only be run with english locale.");
+        }
+    }
+    
+    @Test
+    public void testEnumObjectItemsNonExisting() {
+        Exception caughtException = null;
+        try {
+            PdhUtil.PdhEnumObjectItems(null, null, "Unknown counter", 100);
+        } catch (Exception ex) {
+            caughtException = ex;
+        }
+        assertNotNull(caughtException);
+        assertTrue(caughtException instanceof PdhException);
+        assertEquals(Pdh.PDH_CSTATUS_NO_OBJECT, ((PdhException) caughtException).getErrorCode());
     }
 }

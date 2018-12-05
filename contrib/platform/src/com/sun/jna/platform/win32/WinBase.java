@@ -1,33 +1,44 @@
 /* Copyright (c) 2010 Daniel Doubrovkine, All Rights Reserved
  *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
+ * 
+ * You can freely decide which license you want to apply to 
+ * the project.
+ * 
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
 package com.sun.jna.platform.win32;
 
 import java.text.DateFormat;
-import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
-import java.util.List;
 
 import com.sun.jna.Callback;
+import com.sun.jna.Native;
 import com.sun.jna.Platform;
 import com.sun.jna.Pointer;
 import com.sun.jna.Structure;
+import com.sun.jna.Structure.FieldOrder;
 import com.sun.jna.Union;
-import com.sun.jna.platform.win32.WinDef.DWORDLONG;
 import com.sun.jna.platform.win32.WinNT.HANDLE;
+import com.sun.jna.platform.win32.WinNT.LARGE_INTEGER;
 import com.sun.jna.ptr.ByteByReference;
-import com.sun.jna.win32.StdCallLibrary;
 import com.sun.jna.win32.StdCallLibrary.StdCallCallback;
+import com.sun.jna.win32.W32APITypeMapper;
 
 /**
  * Ported from Winbase.h (kernel32.dll/kernel services).
@@ -38,7 +49,7 @@ public interface WinBase extends WinDef, BaseTSD {
 
     /** Constant value representing an invalid HANDLE. */
     HANDLE INVALID_HANDLE_VALUE =
-        new HANDLE(Pointer.createConstant(Pointer.SIZE == 8
+        new HANDLE(Pointer.createConstant(Native.POINTER_SIZE == 8
                                           ? -1 : 0xFFFFFFFFL));
 
     int WAIT_FAILED = 0xFFFFFFFF;
@@ -184,20 +195,616 @@ public interface WinBase extends WinDef, BaseTSD {
      */
     int STILL_ACTIVE = WinNT.STATUS_PENDING;
 
+    // Codes for FILE_INFO_BY_HANDLE_CLASS taken from Winbase.h
+    int FileBasicInfo                   = 0;
+    int FileStandardInfo                = 1;
+    int FileNameInfo                    = 2;
+    int FileRenameInfo                  = 3;
+    int FileDispositionInfo             = 4;
+    int FileAllocationInfo              = 5;
+    int FileEndOfFileInfo               = 6;
+    int FileStreamInfo                  = 7;
+    int FileCompressionInfo             = 8;
+    int FileAttributeTagInfo            = 9;
+    int FileIdBothDirectoryInfo         = 10; // 0xA
+    int FileIdBothDirectoryRestartInfo  = 11; // 0xB
+    int FileIoPriorityHintInfo          = 12; // 0xC
+    int FileRemoteProtocolInfo          = 13; // 0xD
+    int FileFullDirectoryInfo           = 14; // 0xE
+    int FileFullDirectoryRestartInfo    = 15; // 0xF
+    int FileStorageInfo                 = 16; // 0x10
+    int FileAlignmentInfo               = 17; // 0x11
+    int FileIdInfo                      = 18; // 0x12
+    int FileIdExtdDirectoryInfo         = 19; // 0x13
+    int FileIdExtdDirectoryRestartInfo  = 20; // 0x14
+
+    /**
+     * Contains the basic information for a file. Used for file handles.
+     */
+    @FieldOrder({"CreationTime", "LastAccessTime", "LastWriteTime", "ChangeTime", "FileAttributes"})
+    public static class FILE_BASIC_INFO extends Structure {
+
+        public static class ByReference extends FILE_BASIC_INFO implements Structure.ByReference {
+            public ByReference() {
+            }
+
+            public ByReference(Pointer memory) {
+                super(memory);
+            }
+        }
+
+        /**
+         * The time the file was created in FILETIME format, which is a 64-bit value
+         * representing the number of 100-nanosecond intervals since January 1, 1601 (UTC).
+         */
+        public LARGE_INTEGER CreationTime;
+
+        /**
+         * The time the file was last accessed in FILETIME format.
+         */
+        public LARGE_INTEGER LastAccessTime;
+
+        /**
+         * The time the file was last written to in FILETIME format.
+         */
+        public LARGE_INTEGER LastWriteTime;
+
+        /**
+         * The time the file was changed in FILETIME format.
+         */
+        public LARGE_INTEGER ChangeTime;
+
+        /**
+         * The file attributes. For a list of attributes, see File Attribute Constants.
+         * If this is set to 0 in a FILE_BASIC_INFO structure passed to SetFileInformationByHandle
+         * then none of the attributes are changed.
+         */
+        public int FileAttributes;
+
+        public static int sizeOf()
+        {
+            return Native.getNativeSize(FILE_BASIC_INFO.class, null);
+        }
+
+        public FILE_BASIC_INFO() {
+            super();
+        }
+
+        public FILE_BASIC_INFO(Pointer memory) {
+            super(memory);
+            read();
+            // This is admittedly odd, but the read() doesn't properly initialize the LARGE_INTEGERs via contructors, so do so here.
+            this.CreationTime = new LARGE_INTEGER(this.CreationTime.getValue());
+            this.LastAccessTime = new LARGE_INTEGER(this.LastAccessTime.getValue());
+            this.LastWriteTime = new LARGE_INTEGER(this.LastWriteTime.getValue());
+            this.ChangeTime = new LARGE_INTEGER(this.ChangeTime.getValue());
+        }
+
+        public FILE_BASIC_INFO(FILETIME CreationTime,
+                FILETIME LastAccessTime,
+                FILETIME LastWriteTime,
+                FILETIME ChangeTime,
+                int FileAttributes) {
+            this.CreationTime = new LARGE_INTEGER(CreationTime.toTime());
+            this.LastAccessTime = new LARGE_INTEGER(LastAccessTime.toTime());
+            this.LastWriteTime = new LARGE_INTEGER(LastWriteTime.toTime());
+            this.ChangeTime = new LARGE_INTEGER(ChangeTime.toTime());
+            this.FileAttributes = FileAttributes;
+            write();
+        }
+
+        public FILE_BASIC_INFO(LARGE_INTEGER CreationTime,
+                LARGE_INTEGER LastAccessTime,
+                LARGE_INTEGER LastWriteTime,
+                LARGE_INTEGER ChangeTime,
+                int FileAttributes) {
+            this.CreationTime = CreationTime;
+            this.LastAccessTime = LastAccessTime;
+            this.LastWriteTime = LastWriteTime;
+            this.ChangeTime = ChangeTime;
+            this.FileAttributes = FileAttributes;
+            write();
+        }
+    }
+
+    /**
+     * Receives extended information for the file. Used for file handles. Use only when calling GetFileInformationByHandleEx.
+     */
+    @FieldOrder({"AllocationSize", "EndOfFile", "NumberOfLinks", "DeletePending", "Directory"})
+    public static class FILE_STANDARD_INFO extends Structure {
+
+        public static class ByReference extends FILE_STANDARD_INFO implements Structure.ByReference {
+            public ByReference() {
+            }
+
+            public ByReference(Pointer memory) {
+                super(memory);
+            }
+        }
+
+        /**
+         * The amount of space that is allocated for the file.
+         */
+        public LARGE_INTEGER AllocationSize;
+
+        /**
+         * The end of the file.
+         */
+        public LARGE_INTEGER EndOfFile;
+
+        /**
+         * The number of links to the file.
+         */
+        public int NumberOfLinks;
+
+        /**
+         * TRUE if the file in the delete queue; otherwise, false.
+         */
+        public boolean DeletePending;
+
+        /**
+         * TRUE if the file is a directory; otherwise, false.
+         */
+        public boolean Directory;
+
+        public static int sizeOf()
+        {
+            return Native.getNativeSize(FILE_STANDARD_INFO.class, null);
+        }
+
+        public FILE_STANDARD_INFO() {
+            super();
+        }
+
+        public FILE_STANDARD_INFO(Pointer memory) {
+            super(memory);
+            read();
+        }
+
+        public FILE_STANDARD_INFO(LARGE_INTEGER AllocationSize,
+                LARGE_INTEGER EndOfFile,
+                int NumberOfLinks,
+                boolean DeletePending,
+                boolean Directory) {
+            this.AllocationSize = AllocationSize;
+            this.EndOfFile = EndOfFile;
+            this.NumberOfLinks = NumberOfLinks;
+            this.DeletePending = DeletePending;
+            this.Directory = Directory;
+            write();
+        }
+    }
+
+    /**
+     * Indicates whether a file should be deleted. Used for any handles. Use only when calling SetFileInformationByHandle.
+     */
+    @FieldOrder({"DeleteFile"})
+    public static class FILE_DISPOSITION_INFO extends Structure {
+
+        public static class ByReference extends FILE_DISPOSITION_INFO  implements Structure.ByReference {
+            public ByReference() {
+            }
+
+            public ByReference(Pointer memory) {
+                super(memory);
+            }
+        }
+
+        /**
+         * Indicates whether the file should be deleted. Set to TRUE to delete the file. This member
+         * has no effect if the handle was opened with FILE_FLAG_DELETE_ON_CLOSE.
+         */
+        public boolean DeleteFile;
+
+        public static int sizeOf()
+        {
+            return Native.getNativeSize(FILE_DISPOSITION_INFO.class, null);
+        }
+
+        public FILE_DISPOSITION_INFO () {
+            super();
+        }
+
+        public FILE_DISPOSITION_INFO (Pointer memory) {
+            super(memory);
+            read();
+        }
+
+        public FILE_DISPOSITION_INFO (boolean DeleteFile) {
+            this.DeleteFile = DeleteFile;
+            write();
+        }
+    }
+
+    /**
+     * Receives extended information for the file. Used for file handles. Use only when calling GetFileInformationByHandleEx.
+     */
+    @FieldOrder({"CompressedFileSize", "CompressionFormat", "CompressionUnitShift", "ChunkShift", "ClusterShift", "Reserved"})
+    public static class FILE_COMPRESSION_INFO extends Structure {
+
+        public static class ByReference extends FILE_COMPRESSION_INFO implements Structure.ByReference {
+            public ByReference() {
+            }
+
+            public ByReference(Pointer memory) {
+                super(memory);
+            }
+        }
+
+        /**
+         * The file size of the compressed file.
+         */
+        public LARGE_INTEGER CompressedFileSize;
+
+        /**
+         * The compression format that is used to compress the file.
+         */
+        public short CompressionFormat;
+
+        /**
+         * The factor that the compression uses.
+         */
+        public byte CompressionUnitShift;
+
+        /**
+         * The number of chunks that are shifted by compression.
+         */
+        public byte ChunkShift;
+
+        /**
+         * The number of clusters that are shifted by compression.
+         */
+        public byte ClusterShift;
+
+        /**
+         * Reserved
+         */
+        public byte[] Reserved = new byte[3];
+
+        public static int sizeOf()
+        {
+            return Native.getNativeSize(FILE_COMPRESSION_INFO.class, null);
+        }
+
+        public FILE_COMPRESSION_INFO() {
+            super(W32APITypeMapper.DEFAULT);
+        }
+
+        public FILE_COMPRESSION_INFO(Pointer memory) {
+            super(memory, Structure.ALIGN_DEFAULT, W32APITypeMapper.DEFAULT);
+            read();
+        }
+
+        public FILE_COMPRESSION_INFO(LARGE_INTEGER CompressedFileSize,
+                short CompressionFormat,
+                byte CompressionUnitShift,
+                byte ChunkShift,
+                byte ClusterShift) {
+            this.CompressedFileSize = CompressedFileSize;
+            this.CompressionFormat = CompressionFormat;
+            this.CompressionUnitShift = CompressionUnitShift;
+            this.ChunkShift = ChunkShift;
+            this.ClusterShift = ClusterShift;
+            this.Reserved = new byte[3];
+            write();
+        }
+    }
+
+    /**
+     * Receives the requested file attribute information. Used for any handles. Use only when calling GetFileInformationByHandleEx.
+     */
+    @FieldOrder({"FileAttributes", "ReparseTag"})
+    public static class FILE_ATTRIBUTE_TAG_INFO extends Structure {
+
+        public static class ByReference extends FILE_ATTRIBUTE_TAG_INFO implements Structure.ByReference {
+            public ByReference() {
+            }
+
+            public ByReference(Pointer memory) {
+                super(memory);
+            }
+        }
+
+        /**
+         * The file attribute information.
+         */
+        public int FileAttributes;
+
+        /**
+         * The reparse tag.
+         */
+        public int ReparseTag;
+
+        public static int sizeOf()
+        {
+            return Native.getNativeSize(FILE_ATTRIBUTE_TAG_INFO.class, null);
+        }
+
+        public FILE_ATTRIBUTE_TAG_INFO() {
+            super();
+        }
+
+        public FILE_ATTRIBUTE_TAG_INFO(Pointer memory) {
+            super(memory);
+            read();
+        }
+
+        public FILE_ATTRIBUTE_TAG_INFO(int FileAttributes,
+                int ReparseTag) {
+            this.FileAttributes = FileAttributes;
+            this.ReparseTag = ReparseTag;
+            write();
+        }
+    }
+
+    /**
+     * Contains identification information for a file. This structure is returned from the
+     * GetFileInformationByHandleEx function when FileIdInfo is passed in the
+     * FileInformationClass parameter.
+     */
+    @FieldOrder({"VolumeSerialNumber", "FileId"})
+    public static class FILE_ID_INFO extends Structure {
+
+        public static class ByReference extends FILE_ID_INFO implements Structure.ByReference {
+            public ByReference() {
+            }
+
+            public ByReference(Pointer memory) {
+                super(memory);
+            }
+        }
+
+        @FieldOrder({"Identifier"})
+        public static class FILE_ID_128 extends Structure {
+            public BYTE[] Identifier = new BYTE[16];
+
+            public FILE_ID_128() {
+                super();
+            }
+
+            public FILE_ID_128(Pointer memory) {
+                super(memory);
+                read();
+            }
+
+            public FILE_ID_128(BYTE[] Identifier) {
+                this.Identifier = Identifier;
+                write();
+            }
+        }
+
+        /**
+         * The serial number of the volume that contains a file.
+         */
+        public long VolumeSerialNumber;
+
+        /**
+         * The end of the file.
+         */
+        public FILE_ID_128 FileId;
+
+        public static int sizeOf()
+        {
+            return Native.getNativeSize(FILE_ID_INFO.class, null);
+        }
+
+        public FILE_ID_INFO() {
+            super();
+        }
+
+        public FILE_ID_INFO(Pointer memory) {
+            super(memory);
+            read();
+        }
+
+        public FILE_ID_INFO(long VolumeSerialNumber,
+                FILE_ID_128 FileId) {
+            this.VolumeSerialNumber = VolumeSerialNumber;
+            this.FileId = FileId;
+            write();
+        }
+    }
+
+    // FINDEX_INFO_LEVELS values defines values that are used with the FindFirstFileEx function to specify the information level of the returned data.
+
+    /**
+     * The FindFirstFileEx function retrieves a standard set of attribute information. The data is returned
+     * in a WIN32_FIND_DATA structure.
+     */
+    int FindExInfoStandard = 0;
+
+    /**
+     * The FindFirstFileEx function does not query the short file name, improving overall enumeration speed. The data is
+     * returned in a WIN32_FIND_DATA structure, and the cAlternateFileName member is always a NULL string.
+     */
+    int FindExInfoBasic = 1;
+    /**
+     * This value is used for validation. Supported values are less than this value.
+     */
+    int FindExInfoMaxInfoLevel = 2;
+
+    // FINDEX_SEARCH_OPS values defines values that are used with the FindFirstFileEx function to specify the type of filtering to perform.
+    /**
+     * The search for a file that matches a specified file name. The lpSearchFilter parameter of FindFirstFileEx
+     * must be NULL when this search operation is used.
+     */
+    int FindExSearchNameMatch = 0;
+
+    /**
+     * This is an advisory flag. If the file system supports directory filtering, the function searches for a file that
+     * matches the specified name and is also a directory. If the file system does not support directory filtering,
+     * this flag is silently ignored.
+     * The lpSearchFilter parameter of the FindFirstFileEx function must be NULL when this search value is used.
+     * If directory filtering is desired, this flag can be used on all file systems, but because it is an advisory
+     * flag and only affects file systems that support it, the application must examine the file attribute data stored
+     * in the lpFindFileData parameter of the FindFirstFileEx function to determine whether the function has returned
+     * a handle to a directory.
+     */
+    int FindExSearchLimitToDirectories = 1;
+
+    /**
+     * This filtering type is not available. For more information, see Device Interface Classes.
+     */
+    int FindExSearchLimitToDevices = 2;
+
+    /**
+     * Contains information about the file that is found by the FindFirstFile, FindFirstFileEx, or FindNextFile function.
+     */
+    @FieldOrder({"dwFileAttributes", "ftCreationTime", "ftLastAccessTime", "ftLastWriteTime", "nFileSizeHigh", "nFileSizeLow", "dwReserved0", "dwReserved1", "cFileName", "cAlternateFileName"})
+    public static class WIN32_FIND_DATA extends Structure {
+
+        public static class ByReference extends WIN32_FIND_DATA implements Structure.ByReference {
+            public ByReference() {
+            }
+
+            public ByReference(Pointer memory) {
+                super(memory);
+            }
+        }
+
+        /**
+         * The file attributes of a file. For possible values and their descriptions,
+         * see File Attribute Constants. The FILE_ATTRIBUTE_SPARSE_FILE attribute on
+         * the file is set if any of the streams of the file have ever been sparse.
+         */
+        public int dwFileAttributes;
+
+        /**
+         * A FILETIME structure that specifies when a file or directory was created. If
+         * the underlying file system does not support creation time, this member is zero.
+         */
+        public FILETIME ftCreationTime;
+
+        /**
+         * A FILETIME structure.  For a file, the structure specifies when the file was last
+         * read from, written to, or for executable files, run. For a directory, the structure
+         * specifies when the directory is created. If the underlying file system does not
+         * support last access time, this member is zero. On the FAT file system, the
+         * specified date for both files and directories is correct, but the time of day is
+         * always set to midnight.
+         */
+        public FILETIME ftLastAccessTime;
+
+        /**
+         * A FILETIME structure. For a file, the structure specifies when the file was last
+         * written to, truncated, or overwritten, for example, when WriteFile or SetEndOfFile
+         * are used. The date and time are not updated when file attributes or security descriptors
+         * are changed. For a directory, the structure specifies when the directory is created.
+         * If the underlying file system does not support last write time, this member is zero.
+         */
+        public FILETIME ftLastWriteTime;
+
+        /**
+         * The high-order DWORD value of the file size, in bytes. This value is zero unless the
+         * file size is greater than MAXDWORD.
+         * The size of the file is equal to (nFileSizeHigh * (MAXDWORD+1)) + nFileSizeLow.
+         */
+        public int nFileSizeHigh;
+
+        /**
+         * The low-order DWORD value of the file size, in bytes.
+         */
+        public int nFileSizeLow;
+
+        /**
+         * If the dwFileAttributes member includes the FILE_ATTRIBUTE_REPARSE_POINT attribute, this member
+         * specifies the reparse point tag. Otherwise, this value is undefined and should not be used.
+         * For more information see Reparse Point Tags.
+         *
+         * IO_REPARSE_TAG_CSV (0x80000009)
+         * IO_REPARSE_TAG_DEDUP (0x80000013)
+         * IO_REPARSE_TAG_DFS (0x8000000A)
+         * IO_REPARSE_TAG_DFSR (0x80000012)
+         * IO_REPARSE_TAG_HSM (0xC0000004)
+         * IO_REPARSE_TAG_HSM2 (0x80000006)
+         * IO_REPARSE_TAG_MOUNT_POINT (0xA0000003)
+         * IO_REPARSE_TAG_NFS (0x80000014)
+         * IO_REPARSE_TAG_SIS (0x80000007)
+         * IO_REPARSE_TAG_SYMLINK (0xA000000C)
+         * IO_REPARSE_TAG_WIM (0x80000008)
+         */
+        public int dwReserved0;
+
+        /**
+         * Reserved for future use.
+         */
+        public int dwReserved1;
+
+        /**
+         * The name of the file. <b>NOTE: When written from Native memory, this will be a null terminated string.
+         * Any characters after the null terminator are random memory. Use function getFileName to
+         * get a String with the name.</b>
+         */
+        public char[] cFileName = new char[MAX_PATH];
+
+        /**
+         * An alternative name for the file. This name is in the classic 8.3 file name format.
+         * <b>NOTE: When written from Native memory, this will be a null terminated string.
+         * Any characters after the null terminator are random memory. Use function getAlternateFileName to
+         * get a String with the alternate name.</b>
+         */
+        public char[] cAlternateFileName = new char[14];
+
+        public static int sizeOf() {
+            return Native.getNativeSize(WIN32_FIND_DATA.class, null);
+        }
+
+        public WIN32_FIND_DATA() {
+            super(W32APITypeMapper.DEFAULT);
+        }
+
+        public WIN32_FIND_DATA(Pointer memory) {
+            super(memory, Structure.ALIGN_DEFAULT, W32APITypeMapper.DEFAULT);
+            read();
+        }
+
+        public WIN32_FIND_DATA(int dwFileAttributes,
+                FILETIME ftCreationTime,
+                FILETIME ftLastAccessTime,
+                FILETIME ftLastWriteTime,
+                int nFileSizeHigh,
+                int nFileSizeLow,
+                int dwReserved0,
+                int dwReserved1,
+                char[] cFileName,
+                char[] cAlternateFileName) {
+            this.dwFileAttributes = dwFileAttributes;
+            this.ftCreationTime = ftCreationTime;
+            this.ftLastAccessTime = ftLastAccessTime;
+            this.ftLastWriteTime = ftLastWriteTime;
+            this.nFileSizeHigh = nFileSizeHigh;
+            this.nFileSizeLow = nFileSizeLow;
+            this.dwReserved0 = dwReserved0;
+            this.cFileName = cFileName;
+            this.cAlternateFileName = cAlternateFileName;
+            write();
+        }
+
+        /**
+         * @return String containing the file name
+         */
+        public String getFileName() {
+            return Native.toString(cFileName);
+        }
+
+        /**
+         * @return String containing the alternate file name
+         */
+        public String getAlternateFileName() {
+            return Native.toString(cAlternateFileName);
+        }
+    }
+
     /**
      * The FILETIME structure is a 64-bit value representing the number of
      * 100-nanosecond intervals since January 1, 1601 (UTC).
      * Conversion code in this class Copyright 2002-2004 Apache Software Foundation.
      * @author Rainer Klute (klute@rainer-klute.de) for the Apache Software Foundation (org.apache.poi.hpsf)
      */
+    @FieldOrder({"dwLowDateTime", "dwHighDateTime"})
     public static class FILETIME extends Structure {
         public int dwLowDateTime;
         public int dwHighDateTime;
-
-        @Override
-        protected List<String> getFieldOrder() {
-            return Arrays.asList(new String[] { "dwLowDateTime", "dwHighDateTime" });
-        }
 
         public static class ByReference extends FILETIME implements Structure.ByReference {
             public ByReference() {
@@ -212,6 +819,15 @@ public interface WinBase extends WinDef, BaseTSD {
             long rawValue = dateToFileTime(date);
             dwHighDateTime = (int)(rawValue >> 32 & 0xffffffffL);
             dwLowDateTime = (int)(rawValue & 0xffffffffL);
+        }
+
+        /**
+         * Construct FILETIME from LARGE_INTEGER
+         * @param ft
+         */
+        public FILETIME(LARGE_INTEGER ft) {
+            dwHighDateTime = ft.getHigh().intValue();
+            dwLowDateTime = ft.getLow().intValue();
         }
 
         public FILETIME() {
@@ -284,18 +900,6 @@ public interface WinBase extends WinDef, BaseTSD {
         }
 
         /**
-         * <p>Converts this filetime into a number of milliseconds which have
-         * passed since January 1, 1970 (UTC).</p>
-         * @return This filetime as a number of milliseconds which have passed
-         * since January 1, 1970 (UTC)
-         * @deprecated Replaced by {@link #toTime()}
-         */
-        @Deprecated
-        public long toLong() {
-            return toDate().getTime();
-        }
-        
-        /**
          * <p>Converts the two 32-bit unsigned integer parts of this filetime
          * into a 64-bit unsigned integer representing the number of
          * 100-nanosecond intervals since January 1, 1601 (UTC).</p>
@@ -337,6 +941,7 @@ public interface WinBase extends WinDef, BaseTSD {
      * on the function that is being called.
      * @see <A HREF="http://msdn.microsoft.com/en-us/library/ms724950(VS.85).aspx">SYSTEMTIME structure</A>
      */
+    @FieldOrder({"wYear", "wMonth", "wDayOfWeek", "wDay", "wHour", "wMinute", "wSecond", "wMilliseconds"})
     public static class SYSTEMTIME extends Structure {
         // The year. The valid values for this member are 1601 through 30827.
         public short wYear;
@@ -397,11 +1002,6 @@ public interface WinBase extends WinDef, BaseTSD {
         }
 
         @Override
-        protected List<String> getFieldOrder() {
-            return Arrays.asList(new String[] { "wYear", "wMonth", "wDayOfWeek", "wDay", "wHour", "wMinute", "wSecond", "wMilliseconds" });
-        }
-
-        @Override
         public String toString() {
             // if not initialized, return the default representation
             if ((wYear == 0) && (wMonth == 0) && (wDay == 0)
@@ -420,6 +1020,7 @@ public interface WinBase extends WinDef, BaseTSD {
      * Specifies settings for a time zone.
      * http://msdn.microsoft.com/en-us/library/windows/desktop/ms725481(v=vs.85).aspx
      */
+    @FieldOrder({"Bias", "StandardName", "StandardDate", "StandardBias", "DaylightName", "DaylightDate", "DaylightBias"})
     public static class TIME_ZONE_INFORMATION extends Structure {
         public LONG       Bias;
         public String      StandardName;
@@ -429,9 +1030,8 @@ public interface WinBase extends WinDef, BaseTSD {
         public SYSTEMTIME DaylightDate;
         public LONG       DaylightBias;
 
-        @Override
-        protected List<String> getFieldOrder() {
-            return Arrays.asList(new String[] { "Bias", "StandardName", "StandardDate", "StandardBias", "DaylightName", "DaylightDate", "DaylightBias" });
+        public TIME_ZONE_INFORMATION() {
+            super(W32APITypeMapper.DEFAULT);
         }
     }
 
@@ -515,17 +1115,13 @@ public interface WinBase extends WinDef, BaseTSD {
      * The OVERLAPPED structure contains information used in
      * asynchronous (or overlapped) input and output (I/O).
      */
+    @FieldOrder({"Internal", "InternalHigh", "Offset", "OffsetHigh", "hEvent"})
     public static class OVERLAPPED extends Structure {
         public ULONG_PTR Internal;
         public ULONG_PTR InternalHigh;
         public int Offset;
         public int OffsetHigh;
         public HANDLE hEvent;
-
-        @Override
-        protected List<String> getFieldOrder() {
-            return Arrays.asList(new String[] { "Internal", "InternalHigh", "Offset", "OffsetHigh", "hEvent" });
-        }
     }
 
    int INFINITE = 0xFFFFFFFF;
@@ -535,9 +1131,11 @@ public interface WinBase extends WinDef, BaseTSD {
      * type of the processor, the number of processors in the system, the page size, and other such
      * information.
      */
+    @FieldOrder({"processorArchitecture", "dwPageSize", "lpMinimumApplicationAddress", "lpMaximumApplicationAddress", "dwActiveProcessorMask", "dwNumberOfProcessors", "dwProcessorType", "dwAllocationGranularity", "wProcessorLevel", "wProcessorRevision"})
     public static class SYSTEM_INFO extends Structure {
 
         /** Unnamed inner structure. */
+        @FieldOrder({"wProcessorArchitecture", "wReserved"})
         public static class PI extends Structure {
 
             public static class ByReference extends PI implements Structure.ByReference {
@@ -558,11 +1156,6 @@ public interface WinBase extends WinDef, BaseTSD {
              * Reserved for future use.
              */
             public WORD wReserved;
-
-            @Override
-            protected List<String> getFieldOrder() {
-                return Arrays.asList(new String[] { "wProcessorArchitecture", "wReserved" });
-            }
         }
 
         /** Unnamed inner union. */
@@ -633,17 +1226,13 @@ public interface WinBase extends WinDef, BaseTSD {
          * Architecture-dependent processor revision.
          */
         public WORD wProcessorRevision;
-
-        @Override
-        protected List<String> getFieldOrder() {
-            return Arrays.asList(new String[] { "processorArchitecture", "dwPageSize", "lpMinimumApplicationAddress", "lpMaximumApplicationAddress", "dwActiveProcessorMask", "dwNumberOfProcessors", "dwProcessorType", "dwAllocationGranularity", "wProcessorLevel", "wProcessorRevision"});
-        }
     }
 
     /**
      * Contains information about the current state of both physical and virtual memory, including
      * extended memory. The GlobalMemoryStatusEx function stores information in this structure.
      */
+    @FieldOrder({"dwLength", "dwMemoryLoad", "ullTotalPhys", "ullAvailPhys", "ullTotalPageFile", "ullAvailPageFile", "ullTotalVirtual", "ullAvailVirtual", "ullAvailExtendedVirtual"})
     public static class MEMORYSTATUSEX extends Structure {
         /**
          * The size of the structure, in bytes.
@@ -687,11 +1276,6 @@ public interface WinBase extends WinDef, BaseTSD {
          */
         public DWORDLONG ullAvailExtendedVirtual;
 
-        @Override
-        protected List<String> getFieldOrder() {
-            return Arrays.asList(new String[] { "dwLength", "dwMemoryLoad", "ullTotalPhys", "ullAvailPhys", "ullTotalPageFile", "ullAvailPageFile", "ullTotalVirtual", "ullAvailVirtual", "ullAvailExtendedVirtual" });
-        }
-
         public MEMORYSTATUSEX() {
             dwLength = new DWORD(size());
         }
@@ -704,6 +1288,7 @@ public interface WinBase extends WinDef, BaseTSD {
      * objects created by various functions, such as {@link Kernel32#CreateFile},
      * {@link Kernel32#CreatePipe}, or {@link Advapi32#RegCreateKeyEx}.
      */
+    @FieldOrder({"dwLength", "lpSecurityDescriptor", "bInheritHandle"})
     public static class SECURITY_ATTRIBUTES extends Structure {
         /**
          * The size of the structure, in bytes.
@@ -721,11 +1306,6 @@ public interface WinBase extends WinDef, BaseTSD {
          */
         public boolean bInheritHandle;
 
-        @Override
-        protected List<String> getFieldOrder() {
-            return Arrays.asList(new String[] { "dwLength", "lpSecurityDescriptor", "bInheritHandle" });
-        }
-
         public SECURITY_ATTRIBUTES() {
             dwLength = new DWORD(size());
         }
@@ -735,6 +1315,7 @@ public interface WinBase extends WinDef, BaseTSD {
      * Specifies the window station, desktop, standard handles, and appearance of the main
      * window for a process at creation time.
      */
+    @FieldOrder({"cb", "lpReserved", "lpDesktop", "lpTitle", "dwX", "dwY", "dwXSize", "dwYSize", "dwXCountChars", "dwYCountChars", "dwFillAttribute", "dwFlags", "wShowWindow", "cbReserved2", "lpReserved2", "hStdInput", "hStdOutput", "hStdError"})
     public static class STARTUPINFO extends Structure {
         /**
          * The size of the structure, in bytes.
@@ -898,12 +1479,8 @@ public interface WinBase extends WinDef, BaseTSD {
          */
         public HANDLE hStdError;
 
-        @Override
-        protected List<String> getFieldOrder() {
-            return Arrays.asList(new String[] { "cb", "lpReserved", "lpDesktop", "lpTitle", "dwX", "dwY", "dwXSize", "dwYSize", "dwXCountChars", "dwYCountChars", "dwFillAttribute", "dwFlags", "wShowWindow", "cbReserved2", "lpReserved2", "hStdInput", "hStdOutput", "hStdError" });
-        }
-
         public STARTUPINFO() {
+            super(W32APITypeMapper.DEFAULT);
             cb = new DWORD(size());
         }
     }
@@ -913,6 +1490,7 @@ public interface WinBase extends WinDef, BaseTSD {
      * thread. It is used with the CreateProcess, CreateProcessAsUser,
      * CreateProcessWithLogonW, or CreateProcessWithTokenW function.
      */
+    @FieldOrder({"hProcess", "hThread", "dwProcessId", "dwThreadId"})
     public static class PROCESS_INFORMATION extends Structure {
 
         /**
@@ -944,11 +1522,6 @@ public interface WinBase extends WinDef, BaseTSD {
          * identifier may be reused.
          */
         public DWORD dwThreadId;
-
-        @Override
-        protected List<String> getFieldOrder() {
-            return Arrays.asList(new String[] { "hProcess", "hThread", "dwProcessId", "dwThreadId" });
-        }
 
         public static class ByReference extends PROCESS_INFORMATION implements Structure.ByReference {
             public ByReference() {
@@ -1035,13 +1608,9 @@ public interface WinBase extends WinDef, BaseTSD {
      * Represents a thread entry point in another process. Can only be expressed as a pointer, as
      * the location has no meaning in the Java process.
      */
+    @FieldOrder({"foreignLocation"})
     public class FOREIGN_THREAD_START_ROUTINE extends Structure {
-        LPVOID foreignLocation;
-
-        @Override
-        protected List<String> getFieldOrder() {
-            return Arrays.asList(new String[] { "foreignLocation" });
-        }
+        public LPVOID foreignLocation;
     }
 
     /**
@@ -1184,8 +1753,10 @@ public interface WinBase extends WinDef, BaseTSD {
      * ReadTotalTimeoutConstant, ReadFile times out.</li>
      *
      * @author Markus
-     *
      */
+    @FieldOrder({"ReadIntervalTimeout", "ReadTotalTimeoutMultiplier",
+                "ReadTotalTimeoutConstant", "WriteTotalTimeoutMultiplier",
+                "WriteTotalTimeoutConstant"})
     public static class COMMTIMEOUTS extends Structure {
         /**
          *
@@ -1247,19 +1818,14 @@ public interface WinBase extends WinDef, BaseTSD {
          *
          */
         public DWORD WriteTotalTimeoutConstant;
-
-        @Override
-        protected List<String> getFieldOrder() {
-            return Arrays.asList(new String[] { "ReadIntervalTimeout", "ReadTotalTimeoutMultiplier",
-                    "ReadTotalTimeoutConstant", "WriteTotalTimeoutMultiplier", "WriteTotalTimeoutConstant" });
-        }
     }
-
-
 
     /**
      * Defines the control setting for a serial communications device.
      */
+    @FieldOrder({"DCBlength", "BaudRate", "controllBits", "wReserved", "XonLim",
+        "XoffLim", "ByteSize", "Parity", "StopBits", "XonChar", "XoffChar",
+        "ErrorChar", "EofChar", "EvtChar", "wReserved1"})
     public static class DCB extends Structure {
 
         /**
@@ -1659,13 +2225,6 @@ public interface WinBase extends WinDef, BaseTSD {
         public DCB() {
             DCBlength = new DWORD(size());
         }
-
-        @Override
-        protected List<String> getFieldOrder() {
-            return Arrays.asList(new String[] { "DCBlength", "BaudRate", "controllBits", "wReserved", "XonLim",
-                    "XoffLim", "ByteSize", "Parity", "StopBits", "XonChar", "XoffChar", "ErrorChar", "EofChar",
-                    "EvtChar", "wReserved1" });
-        }
     }
 
     /**
@@ -1882,4 +2441,38 @@ public interface WinBase extends WinDef, BaseTSD {
          */
         boolean invoke(HMODULE module, Pointer type, Pointer name, Pointer lParam);
     }
+    
+    /**
+     * Enables away mode. This value must be specified with {@link #ES_CONTINUOUS}.
+     *
+     * Away mode should be used only by media-recording and media-distribution
+     * applications that must perform critical background processing on desktop
+     * computers while the computer appears to be sleeping. See Remarks.
+     */
+    int ES_AWAYMODE_REQUIRED = 0x00000040;
+    /**
+     * Informs the system that the state being set should remain in effect until
+     * the next call that uses ES_CONTINUOUS and one of the other state flags is
+     * cleared.
+     */
+    int ES_CONTINUOUS = 0x80000000;
+    /**
+     * Forces the display to be on by resetting the display idle timer.
+     */
+    int ES_DISPLAY_REQUIRED = 0x00000002;
+    /**
+     * Forces the system to be in the working state by resetting the system idle
+     * timer.
+     */
+    int ES_SYSTEM_REQUIRED = 0x00000001;
+    /**
+     * This value is not supported. If ES_USER_PRESENT is combined with other
+     * esFlags values, the call will fail and none of the specified states will
+     * be set.
+     */
+    int ES_USER_PRESENT = 0x00000004;
+
+
+    int MUTEX_MODIFY_STATE = WinNT.MUTANT_QUERY_STATE;
+    int MUTEX_ALL_ACCESS = WinNT.MUTANT_ALL_ACCESS;
 }

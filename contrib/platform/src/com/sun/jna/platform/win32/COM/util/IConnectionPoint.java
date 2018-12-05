@@ -1,19 +1,32 @@
 /* Copyright (c) 2014 Dr David H. Akehurst (itemis), All Rights Reserved
  *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
+ * 
+ * You can freely decide which license you want to apply to 
+ * the project.
+ * 
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
 package com.sun.jna.platform.win32.COM.util;
 
 import com.sun.jna.platform.win32.COM.COMException;
+import com.sun.jna.platform.win32.COM.util.annotation.ComInterface;
 
+@ComInterface(iid="{B196B284-BAB4-101A-B69C-00AA00341D07}")
 public interface IConnectionPoint {
 
 	/**
@@ -35,5 +48,5 @@ public interface IConnectionPoint {
 	 * @param comEventCallbackInterface - the interface that is being listened to
 	 * @param cookie - the cookie that was returned when advise was called
 	 */
-	void unadvise(Class<?> comEventCallbackInterface, final IComEventCallbackCookie cookie);
+	void unadvise(Class<?> comEventCallbackInterface, final IComEventCallbackCookie cookie) throws COMException;
 }

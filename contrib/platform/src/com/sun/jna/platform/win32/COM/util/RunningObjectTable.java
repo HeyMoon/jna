@@ -1,22 +1,30 @@
 /* Copyright (c) 2014 Dr David H. Akehurst (itemis), All Rights Reserved
  *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
+ * 
+ * You can freely decide which license you want to apply to 
+ * the project.
+ * 
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
 package com.sun.jna.platform.win32.COM.util;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
 
 import com.sun.jna.platform.win32.WinNT;
 import com.sun.jna.platform.win32.COM.COMException;
@@ -25,47 +33,33 @@ import com.sun.jna.ptr.PointerByReference;
 
 public class RunningObjectTable implements IRunningObjectTable {
 
-	protected RunningObjectTable(com.sun.jna.platform.win32.COM.RunningObjectTable raw, Factory factory) {
+	protected RunningObjectTable(com.sun.jna.platform.win32.COM.RunningObjectTable raw, ObjectFactory factory) {
 		this.raw = raw;
 		this.factory = factory;
-		this.comThread = factory.getComThread();
 	}
 
-	Factory factory;
-	ComThread comThread;
+	ObjectFactory factory;
 	com.sun.jna.platform.win32.COM.RunningObjectTable raw;
 
 	@Override
 	public Iterable<IDispatch> enumRunning() {
+                assert COMUtils.comIsInitialized() : "COM not initialized";
+            
+                final PointerByReference ppenumMoniker = new PointerByReference();
 
-		try {
+                WinNT.HRESULT hr = this.raw.EnumRunning(ppenumMoniker);
 
-			final PointerByReference ppenumMoniker = new PointerByReference();
+                COMUtils.checkRC(hr);
+                com.sun.jna.platform.win32.COM.EnumMoniker raw = new com.sun.jna.platform.win32.COM.EnumMoniker(
+                                ppenumMoniker.getValue());
 
-			WinNT.HRESULT hr = this.comThread.execute(new Callable<WinNT.HRESULT>() {
-				@Override
-				public WinNT.HRESULT call() throws Exception {
-					return RunningObjectTable.this.raw.EnumRunning(ppenumMoniker);
-				}
-			});
-			COMUtils.checkRC(hr);
-			com.sun.jna.platform.win32.COM.EnumMoniker raw = new com.sun.jna.platform.win32.COM.EnumMoniker(
-					ppenumMoniker.getValue());
-
-			return new EnumMoniker(raw, this.raw, this.factory);
-
-		} catch (InterruptedException e) {
-			throw new RuntimeException(e);
-		} catch (ExecutionException e) {
-			throw new RuntimeException(e);
-		} catch (TimeoutException e) {
-			throw new RuntimeException(e);
-		}
-
+                return new EnumMoniker(raw, this.raw, this.factory);
 	}
 
 	@Override
 	public <T> List<T> getActiveObjectsByInterface(Class<T> comInterface) {
+                assert COMUtils.comIsInitialized() : "COM not initialized";
+            
 		List<T> result = new ArrayList<T>();
 
 		for (IDispatch obj : this.enumRunning()) {

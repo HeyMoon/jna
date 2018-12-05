@@ -1,25 +1,32 @@
 /*
  * Copyright 2014 Martin Steiger
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *  http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
+ * 
+ * You can freely decide which license you want to apply to 
+ * the project.
+ * 
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
-
 package com.sun.jna.platform.win32;
 
-import java.util.Arrays;
-import java.util.List;
 
 import com.sun.jna.Structure;
+import com.sun.jna.Structure.FieldOrder;
 import com.sun.jna.platform.EnumUtils;
 import com.sun.jna.platform.win32.WinDef.BYTE;
 import com.sun.jna.platform.win32.WinDef.DWORD;
@@ -33,8 +40,8 @@ public interface LowLevelMonitorConfigurationAPI
     /**
      * Contains information from a monitor's timing report.
      */
-    class MC_TIMING_REPORT extends Structure
-    {
+    @FieldOrder({"dwHorizontalFrequencyInHZ", "dwVerticalFrequencyInHZ", "bTimingStatusByte"})
+    class MC_TIMING_REPORT extends Structure {
         /**
          * The monitor's horizontal synchronization frequency in Hz.
          */
@@ -46,16 +53,10 @@ public interface LowLevelMonitorConfigurationAPI
         public DWORD dwVerticalFrequencyInHZ;
 
         /**
-         * Timing status byte. For more information about this value, see the Display Data Channel Command 
+         * Timing status byte. For more information about this value, see the Display Data Channel Command
          * Interface (DDC/CI) standard.
          */
         public BYTE bTimingStatusByte;
-
-        @Override
-        protected List<String> getFieldOrder()
-        {
-            return Arrays.asList("dwHorizontalFrequencyInHZ", "dwVerticalFrequencyInHZ", "bTimingStatusByte");
-        }
     }
 
     /**
@@ -64,7 +65,7 @@ public interface LowLevelMonitorConfigurationAPI
     enum MC_VCP_CODE_TYPE
     {
         /**
-         * Momentary VCP code. Sending a command of this type causes the monitor to initiate a self-timed 
+         * Momentary VCP code. Sending a command of this type causes the monitor to initiate a self-timed
          * operation and then revert to its original state. Examples include display tests and degaussing.
          */
         MC_MOMENTARY,

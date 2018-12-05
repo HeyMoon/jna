@@ -1,18 +1,30 @@
 /* Copyright (c) 2010 Daniel Doubrovkine, All Rights Reserved
-*
-* This library is free software; you can redistribute it and/or
-* modify it under the terms of the GNU Lesser General Public
-* License as published by the Free Software Foundation; either
-* version 2.1 of the License, or (at your option) any later version.
-*
-* This library is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-* Lesser General Public License for more details.
-*/
+ *
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
+ * 
+ * You can freely decide which license you want to apply to 
+ * the project.
+ * 
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
+ */
 package com.sun.jna.platform.win32;
 
 import com.sun.jna.IntegerType;
+import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 import com.sun.jna.ptr.ByReference;
 
@@ -33,7 +45,7 @@ public interface BaseTSD {
         }
 
         public LONG_PTR(long value) {
-            super(Pointer.SIZE, value);
+            super(Native.POINTER_SIZE, value);
         }
 
         public Pointer toPointer() {
@@ -63,7 +75,7 @@ public interface BaseTSD {
         }
 
         public ULONG_PTR(long value) {
-            super(Pointer.SIZE, value, true);
+            super(Native.POINTER_SIZE, value, true);
         }
 
         public Pointer toPointer() {
@@ -79,11 +91,11 @@ public interface BaseTSD {
             this(new ULONG_PTR(0));
         }
         public ULONG_PTRByReference(ULONG_PTR value) {
-            super(Pointer.SIZE);
+            super(Native.POINTER_SIZE);
             setValue(value);
         }
         public void setValue(ULONG_PTR value) {
-            if (Pointer.SIZE == 4) {
+            if (Native.POINTER_SIZE == 4) {
                 getPointer().setInt(0, value.intValue());
             }
             else {
@@ -91,7 +103,7 @@ public interface BaseTSD {
             }
         }
         public ULONG_PTR getValue() {
-            return new ULONG_PTR(Pointer.SIZE == 4
+            return new ULONG_PTR(Native.POINTER_SIZE == 4
                                  ? getPointer().getInt(0)
                                  : getPointer().getLong(0));
         }
@@ -107,7 +119,7 @@ public interface BaseTSD {
         }
 
         public DWORD_PTR(long value) {
-            super(Pointer.SIZE, value);
+            super(Native.POINTER_SIZE, value);
         }
     }
 

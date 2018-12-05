@@ -20,6 +20,7 @@ import com.sun.jna.Pointer;
 import com.sun.jna.platform.win32.WinDef.HWND;
 import com.sun.jna.platform.win32.WinNT.HANDLE;
 import com.sun.jna.ptr.IntByReference;
+import org.junit.Assume;
 
 /**
  * @author lgoldstein
@@ -29,6 +30,8 @@ public class Kernel32ConsoleTest extends AbstractWin32TestSupport {
 
 	@Test
 	public void testGetConsoleDisplayMode() {
+                // If there is no console window, it can't be queried
+                Assume.assumeNotNull(INSTANCE.GetConsoleWindow());
 		IntByReference	curMode=new IntByReference();
 		assertCallSucceeded("Initial display mode value retrieval", INSTANCE.GetConsoleDisplayMode(curMode));
 	}
@@ -49,9 +52,11 @@ public class Kernel32ConsoleTest extends AbstractWin32TestSupport {
 
 	@Test
 	public void testGetConsoleWindow() {
+                // Only the call is done -- the prior test checked for not-null
+                // but running this test from netbeans IDE or console
+                // always resulted in NULL and this is a valid value
+                // (if there is no console attached)
 		HWND	hwnd=INSTANCE.GetConsoleWindow();
-		// don't really care what the handle value is - just ensure that API can be called
-		assertNotNull("No console window handle", hwnd);
 	}
 
 	@Test

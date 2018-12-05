@@ -1,17 +1,30 @@
 /* Copyright (c) 2007 Wayne Meissner, All Rights Reserved
  *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- * <p/>
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
+ * 
+ * You can freely decide which license you want to apply to 
+ * the project.
+ * 
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
 
 package com.sun.jna;
+
+import java.lang.reflect.InvocationTargetException;
 
 /**
  * Represents a native integer value, which may have a platform-specific size
@@ -26,6 +39,7 @@ package com.sun.jna;
  * @author twalljava@java.net
  */
 public abstract class IntegerType extends Number implements NativeMapped {
+    private static final long serialVersionUID = 1L;
 
     private int size;
     private Number number;
@@ -65,20 +79,20 @@ public abstract class IntegerType extends Number implements NativeMapped {
         case 1:
             if (unsigned) this.value = value & 0xFFL;
             truncated = (byte) value;
-            this.number = new Byte((byte) value);
+            this.number = Byte.valueOf((byte) value);
             break;
         case 2:
             if (unsigned) this.value = value & 0xFFFFL;
             truncated = (short) value;
-            this.number = new Short((short) value);
+            this.number = Short.valueOf((short) value);
             break;
         case 4:
             if (unsigned) this.value = value & 0xFFFFFFFFL;
             truncated = (int) value;
-            this.number = new Integer((int) value);
+            this.number = Integer.valueOf((int) value);
             break;
         case 8:
-            this.number = new Long(value);
+            this.number = Long.valueOf(value);
             break;
         default:
             throw new IllegalArgumentException("Unsupported size: " + size);
@@ -104,23 +118,13 @@ public abstract class IntegerType extends Number implements NativeMapped {
         // be forgiving of null values read from memory
         long value = nativeValue == null
             ? 0 : ((Number) nativeValue).longValue();
-        try {
-            IntegerType number = getClass().newInstance();
-            number.setValue(value);
-            return number;
-        }
-        catch (InstantiationException e) {
-            throw new IllegalArgumentException("Can't instantiate "
-                    + getClass());
-        }
-        catch (IllegalAccessException e) {
-            throw new IllegalArgumentException("Not allowed to instantiate "
-                    + getClass());
-        }
+        IntegerType number = Klass.newInstance(getClass());
+        number.setValue(value);
+        return number;
     }
 
     @Override
-    public Class nativeType() {
+    public Class<?> nativeType() {
         return number.getClass();
     }
 

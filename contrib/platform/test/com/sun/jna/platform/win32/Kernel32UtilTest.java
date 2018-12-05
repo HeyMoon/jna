@@ -23,8 +23,10 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
+import com.sun.jna.Pointer;
 import com.sun.jna.platform.win32.Tlhelp32.MODULEENTRY32W;
 import com.sun.jna.platform.win32.WinNT.HANDLE;
+import com.sun.jna.platform.win32.WinNT.HRESULT;
 import com.sun.jna.platform.win32.WinNT.LARGE_INTEGER;
 
 import junit.framework.TestCase;
@@ -91,18 +93,50 @@ public class Kernel32UtilTest extends TestCase {
         }
     }
 
+    public void testFreeLocalMemory() {
+        try {
+            Pointer ptr = new Pointer(0xFFFFFFFFFFFFFFFFL);
+            Kernel32Util.freeLocalMemory(ptr);
+            fail("Unexpected success to free bad local memory");
+        } catch(Win32Exception e) {
+            HRESULT hr = e.getHR();
+            int code = W32Errors.HRESULT_CODE(hr.intValue());
+            assertEquals("Mismatched failure reason code", WinError.ERROR_INVALID_HANDLE, code);
+        }
+    }
+
+    public void testFreeGlobalMemory() {
+        try {
+            Pointer ptr = new Pointer(0xFFFFFFFFFFFFFFFFL);
+            Kernel32Util.freeGlobalMemory(ptr);
+            fail("Unexpected success to free bad global memory");
+        } catch(Win32Exception e) {
+            HRESULT hr = e.getHR();
+            int code = W32Errors.HRESULT_CODE(hr.intValue());
+            assertEquals("Mismatched failure reason code", WinError.ERROR_INVALID_HANDLE, code);
+        }
+    }
+
     public void testGetComputerName() {
         assertTrue(Kernel32Util.getComputerName().length() > 0);
     }
 
     public void testFormatMessageFromLastErrorCode() {
-        assertEquals("The remote server has been paused or is in the process of being started.",
-                Kernel32Util.formatMessageFromLastErrorCode(W32Errors.ERROR_SHARING_PAUSED));
+        if (AbstractWin32TestSupport.isEnglishLocale) {
+            assertEquals("The remote server has been paused or is in the process of being started.",
+                    Kernel32Util.formatMessageFromLastErrorCode(W32Errors.ERROR_SHARING_PAUSED));
+        } else {
+            System.out.println("testFormatMessageFromLastErrorCode Test can only be run on english locale");
+        }
     }
 
     public void testFormatMessageFromHR() {
-        assertEquals("The operation completed successfully.",
-                Kernel32Util.formatMessage(W32Errors.S_OK));
+        if(AbstractWin32TestSupport.isEnglishLocale) {
+            assertEquals("The operation completed successfully.",
+                    Kernel32Util.formatMessage(W32Errors.S_OK));
+        } else {
+            System.out.println("testFormatMessageFromHR Test can only be run on english locale");
+        }
     }
 
     public void testGetTempPath() {
@@ -259,11 +293,14 @@ public class Kernel32UtilTest extends TestCase {
     }
 
     public final void testQueryFullProcessImageName() {
-        HANDLE h = Kernel32.INSTANCE.OpenProcess(0, false, Kernel32.INSTANCE.GetCurrentProcessId());
+        HANDLE h = Kernel32.INSTANCE.OpenProcess(WinNT.PROCESS_QUERY_INFORMATION, false, Kernel32.INSTANCE.GetCurrentProcessId());
         assertNotNull("Failed (" + Kernel32.INSTANCE.GetLastError() + ") to get process handle", h);
-
-        String name = Kernel32Util.QueryFullProcessImageName(h, 0);
-        assertTrue("Failed to query process image name, empty path returned", name.length() > 0);
+        try {
+            String name = Kernel32Util.QueryFullProcessImageName(h, 0);
+            assertTrue("Failed to query process image name, empty path returned", name.length() > 0);
+        } finally {
+            Kernel32Util.closeHandle(h);
+        }
     }
 
     public void testGetResource() {
@@ -278,31 +315,36 @@ public class Kernel32UtilTest extends TestCase {
         assertNotNull("The 'ICO_MYCOMPUTER' resource in explorer.exe should have some content.", results);
         assertTrue("The 'ICO_MYCOMPUTER' resource in explorer.exe should have some content.", results.length > 0);
     }
-    
+
     public void testGetResourceNames() {
         String winDir = Kernel32Util.getEnvironmentVariable("WINDIR");
         assertNotNull("No WINDIR value returned", winDir);
         assertTrue("Specified WINDIR does not exist: " + winDir, new File(winDir).exists());
-        
+
         // On Windows 7, "14" is the type assigned to the "My Computer" icon
         // (which is named "ICO_MYCOMPUTER")
         Map<String, List<String>> names = Kernel32Util.getResourceNames(new File(winDir, "explorer.exe").getAbsolutePath());
-        
+
         assertNotNull("explorer.exe should contain some resources in it.", names);
         assertTrue("explorer.exe should contain some resource types in it.", names.size() > 0);
         assertTrue("explorer.exe should contain a resource of type '14' in it.", names.containsKey("14"));
         assertTrue("resource type 14 should have a name named ICO_MYCOMPUTER associated with it.", names.get("14").contains("ICO_MYCOMPUTER"));
     }
-    
+
     public void testGetModules() {
         List<MODULEENTRY32W> results = Kernel32Util.getModules(Kernel32.INSTANCE.GetCurrentProcessId());
-        
+
         // not sure if this will be run against java.exe or javaw.exe but these checks should work with both
         assertNotNull("There should be some modules returned from this helper", results);
         assertTrue("The first module in this process should be java.exe or javaw.exe", results.get(0).szModule().startsWith("java"));
-        
+
         // since this is supposed to return all the modules in a process, there should be an EXE and at least 1 Windows DLL
         // so assert total count is at least two
         assertTrue("This is supposed to return all the modules in a process, so there should be an EXE and at least 1 Windows API DLL.", results.size() > 2);
+    }
+    
+    public void testExpandEnvironmentStrings() {
+        Kernel32.INSTANCE.SetEnvironmentVariable("DemoVariable", "DemoValue");
+        assertEquals("DemoValue", Kernel32Util.expandEnvironmentStrings("%DemoVariable%"));
     }
 }

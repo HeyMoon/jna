@@ -1,18 +1,30 @@
 /* Copyright (c) 2007-2009 Timothy Wall, All Rights Reserved
  *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
+ * 
+ * You can freely decide which license you want to apply to 
+ * the project.
+ * 
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
 package com.sun.jna;
 
 import java.io.File;
+import java.lang.ref.Reference;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
 import java.net.MalformedURLException;
@@ -25,7 +37,7 @@ import junit.framework.TestCase;
 /** Test loading and unloading native support from various locations.  Note
  * that no JNI classes are directly referenced in these tests.
  */
-public class JNALoadTest extends TestCase implements Paths, GCWaits {
+public class JNALoadTest extends TestCase implements Paths {
 
     private class TestLoader extends URLClassLoader {
         public TestLoader(boolean fromJar) throws MalformedURLException {
@@ -113,31 +125,29 @@ public class JNALoadTest extends TestCase implements Paths, GCWaits {
         String path = (String)field.get(null);
         assertNotNull("Native library path unavailable", path);
         assertTrue("Native library not unpacked from jar: " + path,
-                   path.startsWith(System.getProperty("java.io.tmpdir")));
+                path.startsWith(Native.getTempDir().getAbsolutePath()));
 
-        WeakReference ref = new WeakReference(cls);
-        WeakReference clref = new WeakReference(loader);
+        Reference<Class<?>> ref = new WeakReference<Class<?>>(cls);
+        Reference<ClassLoader> clref = new WeakReference<ClassLoader>(loader);
         loader = null;
         cls = null;
         field = null;
         System.gc();
-        for (int i=0;i < GC_WAITS && (ref.get() != null || clref.get() != null);i++) {
-            Thread.sleep(GC_WAIT_INTERVAL);
-            System.gc();
+        for (int i=0;i < GCWaits.GC_WAITS && (ref.get() != null || clref.get() != null);i++) {
+            GCWaits.gcRun();
         }
         assertNull("Class not GC'd: " + ref.get(), ref.get());
         assertNull("ClassLoader not GC'd: " + clref.get(), clref.get());
 
         // Check for temporary file deletion
         File f = new File(path);
-        for (int i=0;i < GC_WAITS && (f.exists() || Boolean.getBoolean("jna.loaded"));i++) {
-            Thread.sleep(GC_WAIT_INTERVAL);
-            System.gc();
+        for (int i=0;i < GCWaits.GC_WAITS && (f.exists() || Boolean.getBoolean("jna.loaded"));i++) {
+            GCWaits.gcRun();
         }
 
         if (f.exists()) {
-            assertTrue("Temporary jnidispatch not marked for later deletion: "
-                       + f, new File(f.getAbsolutePath()+".x").exists());
+            assertTrue("Temporary jnidispatch not marked for later deletion: " + f,
+                       new File(f.getAbsolutePath()+".x").exists());
         }
         assertFalse("System property jna.loaded not cleared", Boolean.getBoolean("jna.loaded"));
 
@@ -146,11 +156,9 @@ public class JNALoadTest extends TestCase implements Paths, GCWaits {
         try {
             loader = new TestLoader(true);
             cls = Class.forName("com.sun.jna.Native", true, loader);
-        }
-        catch(Throwable t) {
+        } catch(Throwable t) {
             fail("Couldn't load class again after discarding first load: " + t.getMessage());
-        }
-        finally {
+        } finally {
             loader = null;
             cls = null;
             System.gc();
@@ -169,15 +177,14 @@ public class JNALoadTest extends TestCase implements Paths, GCWaits {
         String path = (String)field.get(null);
         assertNotNull("Native library not found", path);
 
-        WeakReference ref = new WeakReference(cls);
-        WeakReference clref = new WeakReference(loader);
+        Reference<Class<?>> ref = new WeakReference<Class<?>>(cls);
+        Reference<ClassLoader> clref = new WeakReference<ClassLoader>(loader);
         loader = null;
         cls = null;
         field = null;
         System.gc();
-        for (int i=0;i < GC_WAITS && (ref.get() != null || clref.get() != null || Boolean.getBoolean("jna.loaded"));i++) {
-            Thread.sleep(GC_WAIT_INTERVAL);
-            System.gc();
+        for (int i=0;i < GCWaits.GC_WAITS && (ref.get() != null || clref.get() != null || Boolean.getBoolean("jna.loaded"));i++) {
+            GCWaits.gcRun();
         }
         assertNull("Class not GC'd: " + ref.get(), ref.get());
         assertNull("ClassLoader not GC'd: " + clref.get(), clref.get());
@@ -186,9 +193,8 @@ public class JNALoadTest extends TestCase implements Paths, GCWaits {
         Throwable throwable = null;
         // NOTE: IBM J9 needs some extra time to unload the native library,
         // so try a few times before failing
-        for (int i=0;i < GC_WAITS;i++) {
-            System.gc();
-            Thread.sleep(GC_WAIT_INTERVAL);
+        for (int i=0;i < GCWaits.GC_WAITS;i++) {
+            GCWaits.gcRun();
             try {
                 loader = new TestLoader(false);
                 cls = Class.forName("com.sun.jna.Native", true, loader);

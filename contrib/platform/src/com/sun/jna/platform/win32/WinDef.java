@@ -1,19 +1,29 @@
 /* Copyright (c) 2010 Daniel Doubrovkine, All Rights Reserved
  *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
+ * 
+ * You can freely decide which license you want to apply to 
+ * the project.
+ * 
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
 package com.sun.jna.platform.win32;
 
 import java.awt.Rectangle;
-import java.util.Arrays;
 import java.util.List;
 
 import com.sun.jna.IntegerType;
@@ -21,6 +31,7 @@ import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 import com.sun.jna.PointerType;
 import com.sun.jna.Structure;
+import com.sun.jna.Structure.FieldOrder;
 import com.sun.jna.platform.win32.BaseTSD.LONG_PTR;
 import com.sun.jna.platform.win32.WinNT.HANDLE;
 import com.sun.jna.platform.win32.WinNT.HANDLEByReference;
@@ -105,7 +116,7 @@ public interface WinDef {
          * @return the value
          */
         public WORD getValue() {
-            return new WORD(getPointer().getInt(0));
+            return new WORD(getPointer().getShort(0));
         }
     }
 
@@ -140,7 +151,7 @@ public interface WinDef {
          * @return Low WORD.
          */
         public WORD getLow() {
-            return new WORD(longValue() & 0xFF);
+            return new WORD(longValue() & 0xFFFF);
         }
 
         /**
@@ -149,7 +160,7 @@ public interface WinDef {
          * @return High WORD.
          */
         public WORD getHigh() {
-            return new WORD((longValue() >> 16) & 0xFF);
+            return new WORD((longValue() >> 16) & 0xFFFF);
         }
 
         @Override
@@ -238,7 +249,7 @@ public interface WinDef {
          * Instantiates a new LONG by reference.
          */
         public LONGByReference() {
-            this(new LONG(0));
+            this(new LONG(0L));
         }
 
         /**
@@ -673,7 +684,7 @@ public interface WinDef {
          * Instantiates a new int ptr.
          */
         public INT_PTR() {
-            super(Pointer.SIZE);
+            super(Native.POINTER_SIZE);
         }
 
         /**
@@ -683,7 +694,7 @@ public interface WinDef {
          *            the value
          */
         public INT_PTR(long value) {
-            super(Pointer.SIZE, value);
+            super(Native.POINTER_SIZE, value);
         }
 
         /**
@@ -705,7 +716,7 @@ public interface WinDef {
          * Instantiates a new uint ptr.
          */
         public UINT_PTR() {
-            super(Pointer.SIZE);
+            super(Native.POINTER_SIZE);
         }
 
         /**
@@ -715,7 +726,7 @@ public interface WinDef {
          *            the value
          */
         public UINT_PTR(long value) {
-            super(Pointer.SIZE, value, true);
+            super(Native.POINTER_SIZE, value, true);
         }
 
         /**
@@ -754,8 +765,8 @@ public interface WinDef {
     /**
      * The Class RECT.
      */
+    @FieldOrder({"left", "top", "right", "bottom"})
     public class RECT extends Structure {
-
         /** The left. */
         public int left;
 
@@ -767,11 +778,6 @@ public interface WinDef {
 
         /** The bottom. */
         public int bottom;
-
-        @Override
-        protected List<String> getFieldOrder() {
-            return Arrays.asList("left", "top", "right", "bottom");
-        }
 
         /**
          * To rectangle.
@@ -1051,19 +1057,54 @@ public interface WinDef {
     /**
      * The Class POINT.
      */
+    @FieldOrder({"x", "y"})
     public class POINT extends Structure {
 
         /**
          * The Class ByReference.
          */
-        public static class ByReference extends POINT implements
-                                                          Structure.ByReference {
+        public static class ByReference extends POINT implements Structure.ByReference {
+
+            public ByReference() {
+            }
+
+            public ByReference(Pointer memory) {
+                super(memory);
+            }
+
+            public ByReference(int x, int y) {
+                super(x, y);
+            }
+
+        }
+        
+        /**
+         * The Class ByValue.
+         */
+        public static class ByValue extends POINT implements Structure.ByValue {
+
+            public ByValue() {
+            }
+
+            public ByValue(Pointer memory) {
+                super(memory);
+            }
+
+            public ByValue(int x, int y) {
+                super(x, y);
+            }
+
         }
 
+        /** The x. */
+        public int x;
+        /** The y. */
+        public int y;
         /**
          * Instantiates a new point.
          */
         public POINT() {
+            super();
         }
 
         /**
@@ -1077,9 +1118,6 @@ public interface WinDef {
             read();
         }
 
-        /** The y. */
-        public int x, y;
-
         /**
          * Instantiates a new point.
          *
@@ -1091,11 +1129,6 @@ public interface WinDef {
         public POINT(int x, int y) {
             this.x = x;
             this.y = y;
-        }
-
-        @Override
-        protected List<String> getFieldOrder() {
-            return Arrays.asList("x", "y");
         }
     }
 
@@ -1401,6 +1434,7 @@ public interface WinDef {
          */
         public BOOL(long value) {
             super(SIZE, value, false);
+            assert value == 0 || value == 1;
         }
 
         public boolean booleanValue() {
@@ -1594,7 +1628,7 @@ public interface WinDef {
          *
          * @param ch The {@code char} value
          */
-        public CHAR(char ch) {
+        public CHAR(byte ch) {
             this(ch & 0xFF);
         }
 

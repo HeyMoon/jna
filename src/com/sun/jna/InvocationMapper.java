@@ -1,3 +1,25 @@
+/**
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
+ * 
+ * You can freely decide which license you want to apply to 
+ * the project.
+ * 
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
+ */
 package com.sun.jna;
 
 import java.lang.reflect.InvocationHandler;
@@ -5,7 +27,7 @@ import java.lang.reflect.Method;
 
 /** Provide a method for overriding how a given function is invoked.
  * An instance of this interface may be provided to 
- * {@link Native#loadLibrary(String, Class, java.util.Map)} as an entry in
+ * {@link Native#load(String, Class, java.util.Map)} as an entry in
  * the options map with key {@link Library#OPTION_INVOCATION_MAPPER}.<p>
  * This is useful for implementing inlined functions, or functions which
  * are actually C preprocessor macros.  Given a native library and JNA
@@ -26,7 +48,7 @@ import java.lang.reflect.Method;
  *                 public Object invoke(Object proxy, Method method, Object[] args) {
  *                     Object[] newArgs = new Object[args.length+1];
  *                     System.arraycopy(args, 0, newArgs, 1, args.length);
- *                     newArgs[0] = new Integer(3); // _xstat version
+ *                     newArgs[0] = Integer.valueOf(3); // _xstat version
  *                     return f.invoke(newArgs);
  *                 }
  *             };

@@ -1,21 +1,33 @@
-/* This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
+/* 
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
+ * 
+ * You can freely decide which license you want to apply to 
+ * the project.
+ * 
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
 package com.sun.jna.platform.win32;
 
-import java.util.Arrays;
 import java.util.List;
 
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 import com.sun.jna.Structure;
+import com.sun.jna.Structure.FieldOrder;
 import com.sun.jna.platform.win32.Guid.GUID;
 import com.sun.jna.platform.win32.WinNT.HANDLE;
 import com.sun.jna.platform.win32.WinReg.HKEY;
@@ -29,21 +41,21 @@ import com.sun.jna.win32.W32APIOptions;
  */
 public interface SetupApi extends StdCallLibrary {
 
-    SetupApi INSTANCE = Native.loadLibrary("setupapi", SetupApi.class, W32APIOptions.DEFAULT_OPTIONS);
+    SetupApi INSTANCE = Native.load("setupapi", SetupApi.class, W32APIOptions.DEFAULT_OPTIONS);
 
     /**
      * The GUID_DEVINTERFACE_DISK device interface class is defined for hard disk storage devices.
      */
     GUID GUID_DEVINTERFACE_DISK = new GUID("53F56307-B6BF-11D0-94F2-00A0C91EFB8B");
 
-    
+
 	/**
 	 * Drivers for serial ports register instances of this device interface
 	 * class to notify the operating system and applications of the presence of
 	 * COM ports.
 	 */
 	GUID GUID_DEVINTERFACE_COMPORT = new GUID("86E0D1E0-8089-11D0-9CE4-08003E301F73");
-	
+
     /**
      * Return only the device that is associated with the system default device interface, if one is set, for the
      * specified device interface classes.
@@ -91,21 +103,21 @@ public interface SetupApi extends StdCallLibrary {
 
 	/**
 	 * Open/Create/Delete device key.
-	 * 
+	 *
      * @see #SetupDiOpenDevRegKey
 	 */
 	int DIREG_DEV = 0x00000001;
 
 	/**
 	 * Open/Create/Delete driver key
-	 * 
+	 *
      * @see #SetupDiOpenDevRegKey
 	 */
 	int DIREG_DRV = 0x00000002;
 
 	/**
 	 * Delete both driver and Device key
-	 * 
+	 *
      * @see #SetupDiOpenDevRegKey
 	 */
 	int DIREG_BOTH = 0x00000004;
@@ -297,7 +309,7 @@ public interface SetupApi extends StdCallLibrary {
 	 * The specified device instance must be registered before this function is called. However, be aware that the
 	 * operating system automatically registers PnP device instances. For information about how to register non-PnP
 	 * device instances, see SetupDiRegisterDeviceInfo.
-	 * 
+	 *
 	 * @param deviceInfoSet
 	 *            A handle to the device information set that contains a device information element that represents the
 	 *            device for which to open a registry key.
@@ -355,8 +367,8 @@ public interface SetupApi extends StdCallLibrary {
 	 * <p>
 	 * Call SetupDiEnumDeviceInterfaces to get a context structure for a device interface element (versus a device
 	 * information element).
-	 * 
-	 * 
+	 *
+	 *
 	 * @param deviceInfoSet
 	 *            A handle to the device information set for which to return an {@link SP_DEVINFO_DATA} structure that
 	 *            represents a device information element.
@@ -373,6 +385,7 @@ public interface SetupApi extends StdCallLibrary {
     /**
      * An SP_DEVICE_INTERFACE_DATA structure defines a device interface in a device information set.
      */
+    @FieldOrder({"cbSize", "InterfaceClassGuid", "Flags", "Reserved"})
     public static class SP_DEVICE_INTERFACE_DATA extends Structure {
 
         public static class ByReference extends SP_DEVINFO_DATA implements Structure.ByReference {
@@ -382,15 +395,6 @@ public interface SetupApi extends StdCallLibrary {
             public ByReference(Pointer memory) {
                 super(memory);
             }
-        }
-
-        public SP_DEVICE_INTERFACE_DATA() {
-            cbSize = size();
-        }
-
-        public SP_DEVICE_INTERFACE_DATA(Pointer memory) {
-            super(memory);
-            read();
         }
 
         /**
@@ -415,15 +419,21 @@ public interface SetupApi extends StdCallLibrary {
          * Reserved. Do not use.
          */
         public Pointer Reserved;
-        
-        protected List<String> getFieldOrder() {
-            return Arrays.asList(new String[] { "cbSize", "InterfaceClassGuid", "Flags", "Reserved" });
+
+        public SP_DEVICE_INTERFACE_DATA() {
+            cbSize = size();
+        }
+
+        public SP_DEVICE_INTERFACE_DATA(Pointer memory) {
+            super(memory);
+            read();
         }
     }
 
     /**
      * An SP_DEVINFO_DATA structure defines a device instance that is a member of a device information set.
      */
+    @FieldOrder({"cbSize", "InterfaceClassGuid", "DevInst", "Reserved"})
     public static class SP_DEVINFO_DATA extends Structure {
 
         public static class ByReference extends SP_DEVINFO_DATA implements Structure.ByReference {
@@ -433,15 +443,6 @@ public interface SetupApi extends StdCallLibrary {
             public ByReference(Pointer memory) {
                 super(memory);
             }
-        }
-
-        public SP_DEVINFO_DATA() {
-            cbSize = size();
-        }
-
-        public SP_DEVINFO_DATA(Pointer memory) {
-            super(memory);
-            read();
         }
 
         /**
@@ -467,9 +468,14 @@ public interface SetupApi extends StdCallLibrary {
          * Reserved. For internal use only.
          */
         public Pointer Reserved;
-        
-        protected List<String> getFieldOrder() {
-            return Arrays.asList(new String[] { "cbSize", "InterfaceClassGuid", "DevInst", "Reserved" });
+
+        public SP_DEVINFO_DATA() {
+            cbSize = size();
+        }
+
+        public SP_DEVINFO_DATA(Pointer memory) {
+            super(memory);
+            read();
         }
     }
 }

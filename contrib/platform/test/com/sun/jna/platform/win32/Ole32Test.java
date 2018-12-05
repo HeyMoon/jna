@@ -16,9 +16,7 @@ import junit.framework.TestCase;
 
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
-import com.sun.jna.platform.win32.BaseTSD.SIZE_T;
 import com.sun.jna.platform.win32.Guid.GUID;
-import com.sun.jna.platform.win32.WinDef.LPVOID;
 import com.sun.jna.platform.win32.WinNT.HRESULT;
 import com.sun.jna.ptr.PointerByReference;
 
@@ -127,5 +125,17 @@ public class Ole32Test extends TestCase {
         assertTrue(!ptr.equals(Pointer.NULL));
 
         Ole32.INSTANCE.CoTaskMemFree(ptr);
+    }
+    
+    public void testOleFunctions() {
+        HRESULT initResult = Ole32.INSTANCE.OleInitialize(Pointer.NULL);
+        
+        assertTrue(W32Errors.SUCCEEDED(initResult));
+        
+        // For a real test, a test component will be needed
+        Ole32.INSTANCE.OleFlushClipboard();
+        Ole32.INSTANCE.OleRun(Pointer.NULL);
+        
+        Ole32.INSTANCE.CoUninitialize();
     }
 }

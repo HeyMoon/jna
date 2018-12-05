@@ -1,23 +1,33 @@
 /* Copyright (c) 2015 Michael Freeman, All Rights Reserved
+ *
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
  * 
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
+ * You can freely decide which license you want to apply to 
+ * the project.
  * 
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.  
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
 package com.sun.jna.platform.win32;
 
-import java.util.Arrays;
-import java.util.List;
 
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 import com.sun.jna.Structure;
+import com.sun.jna.Structure.FieldOrder;
 import com.sun.jna.Union;
 import com.sun.jna.platform.win32.WinNT.HANDLE;
 import com.sun.jna.ptr.IntByReference;
@@ -31,7 +41,7 @@ public interface Wininet extends StdCallLibrary {
     /**
      * A usable instance of this interface
      */
-    Wininet INSTANCE = Native.loadLibrary("wininet", Wininet.class, W32APIOptions.DEFAULT_OPTIONS);
+    Wininet INSTANCE = Native.load("wininet", Wininet.class, W32APIOptions.DEFAULT_OPTIONS);
 
     /**
      * Normal cache entry; can be deleted to recover space for new entries.
@@ -79,7 +89,7 @@ public interface Wininet extends StdCallLibrary {
 
     /**
      * Closes the specified cache enumeration handle.
-     * 
+     *
      * @param hFind
      *            Handle returned by a previous call to the
      *            FindFirstUrlCacheEntry function.
@@ -106,7 +116,7 @@ public interface Wininet extends StdCallLibrary {
 
     /**
      * Begins the enumeration of the Internet cache.
-     * 
+     *
      * @param lpszUrlSearchPattern
      *            A pointer to a string that contains the source name pattern to
      *            search for.<br>
@@ -171,7 +181,7 @@ public interface Wininet extends StdCallLibrary {
 
     /**
      * Contains information about an entry in the Internet cache.
-     * 
+     *
      * <pre>
      * <code>
      * typedef struct _INTERNET_CACHE_ENTRY_INFO {
@@ -195,13 +205,16 @@ public interface Wininet extends StdCallLibrary {
      *     DWORD dwExemptDelta;
      *   };
      * } INTERNET_CACHE_ENTRY_INFO, *LPINTERNET_CACHE_ENTRY_INFO;
-     * 
+     *
      *     </code>
      * </pre>
-     * 
-     * @see https://msdn.microsoft.com/en-us/library/windows/desktop/aa385134(v=
-     *      vs.85).aspx
+     *
+     * @see <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/aa385134(v=vs.85).aspx">MSDN</a>
      */
+    @FieldOrder({"dwStructSize", "lpszSourceUrlName", "lpszLocalFileName",
+        "CacheEntryType", "dwUseCount", "dwHitRate", "dwSizeLow", "dwSizeHigh", "LastModifiedTime",
+        "ExpireTime", "LastAccessTime", "LastSyncTime", "lpHeaderInfo", "dwHeaderInfoSize",
+        "lpszFileExtension", "u", "additional"})
     static class INTERNET_CACHE_ENTRY_INFO extends Structure {
         /**
          * Size of this structure, in bytes. This value can be used to help
@@ -330,7 +343,7 @@ public interface Wininet extends StdCallLibrary {
 
         /**
          * A union of the last two distinct fields in INTERNET_CACHE_ENTRY_INFO
-         * 
+         *
          * <pre>
          * <code>
          *             union {
@@ -349,14 +362,6 @@ public interface Wininet extends StdCallLibrary {
              * Exemption time from the last accessed time, in seconds.
              */
             public int dwExemptDelta;
-        }
-
-        @Override
-        protected List getFieldOrder() {
-            return Arrays.asList("dwStructSize", "lpszSourceUrlName", "lpszLocalFileName",
-                    "CacheEntryType", "dwUseCount", "dwHitRate", "dwSizeLow", "dwSizeHigh", "LastModifiedTime",
-                    "ExpireTime", "LastAccessTime", "LastSyncTime", "lpHeaderInfo", "dwHeaderInfoSize",
-                    "lpszFileExtension", "u", "additional");
         }
 
         @Override

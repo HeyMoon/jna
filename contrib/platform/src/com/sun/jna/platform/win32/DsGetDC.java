@@ -1,29 +1,40 @@
 /* Copyright (c) 2010 Daniel Doubrovkine, All Rights Reserved
+ *
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
  * 
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
+ * You can freely decide which license you want to apply to 
+ * the project.
  * 
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.  
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
 package com.sun.jna.platform.win32;
 
-import java.util.Arrays;
 import java.util.List;
 
 import com.sun.jna.Pointer;
 import com.sun.jna.Structure;
+import com.sun.jna.Structure.FieldOrder;
 import com.sun.jna.platform.win32.Guid.GUID;
 import com.sun.jna.platform.win32.WinNT.PSID;
-import com.sun.jna.win32.StdCallLibrary;
+import com.sun.jna.win32.W32APITypeMapper;
 
 /**
  * Ported from DsGetDC.h. Windows SDK 6.0a
- * 
+ *
  * @author dblock[at]dblock.org
  */
 public interface DsGetDC {
@@ -32,18 +43,14 @@ public interface DsGetDC {
      * The DOMAIN_CONTROLLER_INFO structure is used with the DsGetDcName
      * function to receive data about a domain controller.
      */
+    @FieldOrder({"DomainControllerName",
+        "DomainControllerAddress", "DomainControllerAddressType",
+        "DomainGuid", "DomainName", "DnsForestName", "Flags",
+        "DcSiteName", "ClientSiteName"})
     public static class DOMAIN_CONTROLLER_INFO extends Structure {
 
         public static class ByReference extends DOMAIN_CONTROLLER_INFO
                 implements Structure.ByReference {
-        }
-
-        public DOMAIN_CONTROLLER_INFO() {
-        }
-
-        public DOMAIN_CONTROLLER_INFO(Pointer memory) {
-            super(memory);
-            read();
         }
 
         /**
@@ -111,17 +118,20 @@ public interface DsGetDC {
          */
         public String ClientSiteName;
 
-        protected List getFieldOrder() {
-            return Arrays.asList(new String[] { "DomainControllerName",
-                    "DomainControllerAddress", "DomainControllerAddressType",
-                    "DomainGuid", "DomainName", "DnsForestName", "Flags",
-                    "DcSiteName", "ClientSiteName" });
+        public DOMAIN_CONTROLLER_INFO() {
+            super(W32APITypeMapper.DEFAULT);
+        }
+
+        public DOMAIN_CONTROLLER_INFO(Pointer memory) {
+            super(memory, Structure.ALIGN_DEFAULT, W32APITypeMapper.DEFAULT);
+            read();
         }
     }
 
     /**
      * Pointer to DOMAIN_CONTROLLER_INFO.
      */
+    @FieldOrder({"dci"})
     public static class PDOMAIN_CONTROLLER_INFO extends Structure {
 
         public static class ByReference extends PDOMAIN_CONTROLLER_INFO
@@ -130,10 +140,6 @@ public interface DsGetDC {
         }
 
         public DOMAIN_CONTROLLER_INFO.ByReference dci;
-
-        protected List getFieldOrder() {
-            return Arrays.asList(new String[] { "dci" });
-        }
     }
 
     /**
@@ -171,6 +177,9 @@ public interface DsGetDC {
      * The DS_DOMAIN_TRUSTS structure is used with the DsEnumerateDomainTrusts
      * function to contain trust data for a domain.
      */
+    @FieldOrder({"NetbiosDomainName",
+                "DnsDomainName", "Flags", "ParentIndex", "TrustType",
+                "TrustAttributes", "DomainSid", "DomainGuid"})
     public static class DS_DOMAIN_TRUSTS extends Structure {
 
         public static class ByReference extends DS_DOMAIN_TRUSTS implements
@@ -220,17 +229,12 @@ public interface DsGetDC {
          */
         public GUID DomainGuid;
 
-        protected List getFieldOrder() {
-            return Arrays.asList(new String[] { "NetbiosDomainName",
-                    "DnsDomainName", "Flags", "ParentIndex", "TrustType",
-                    "TrustAttributes", "DomainSid", "DomainGuid" });
-        }
-
         public DS_DOMAIN_TRUSTS() {
+            super(W32APITypeMapper.DEFAULT);
         }
 
         public DS_DOMAIN_TRUSTS(Pointer p) {
-            super(p);
+            super(p, Structure.ALIGN_DEFAULT, W32APITypeMapper.DEFAULT);
             read();
         }
     };

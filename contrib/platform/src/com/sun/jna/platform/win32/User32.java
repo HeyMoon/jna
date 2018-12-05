@@ -1,21 +1,31 @@
 /* Copyright (c) 2007, 2013 Timothy Wall, Markus Karg, All Rights Reserved
  *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- * <p/>
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
+ * 
+ * You can freely decide which license you want to apply to 
+ * the project.
+ * 
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
 package com.sun.jna.platform.win32;
 
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 import com.sun.jna.Structure;
-import com.sun.jna.WString;
 import com.sun.jna.platform.win32.WinGDI.ICONINFO;
 import com.sun.jna.ptr.ByteByReference;
 import com.sun.jna.ptr.IntByReference;
@@ -35,7 +45,7 @@ import com.sun.jna.win32.W32APIOptions;
 public interface User32 extends StdCallLibrary, WinUser, WinNT {
 
     /** The instance. */
-    User32 INSTANCE = Native.loadLibrary("user32", User32.class, W32APIOptions.DEFAULT_OPTIONS);
+    User32 INSTANCE = Native.load("user32", User32.class, W32APIOptions.DEFAULT_OPTIONS);
 
     /**
      * Handle for message-only window.
@@ -69,7 +79,7 @@ public interface User32 extends StdCallLibrary, WinUser, WinNT {
      * </p>
      */
     int SW_SHOWDEFAULT = 10;
-    
+
     /**
      * This function retrieves a handle to a display device context (DC) for the
      * client area of the specified window. The display device context can be
@@ -189,11 +199,30 @@ public interface User32 extends StdCallLibrary, WinUser, WinNT {
      *            Long pointer to a RECT structure that receives the screen
      *            coordinates of the upper-left and lower-right corners of the
      *            window.
-     * @return Nonzero indicates success. Zero indicates failure. To get
-     *         extended error information, call GetLastError.
+     * @return If the function succeeds, the return value is nonzero. If the
+     *         function fails, the return value is zero.
      */
     boolean GetWindowRect(HWND hWnd, RECT rect);
 
+    /**
+     * This function retrieves the coordinates of a window's client area. 
+     * The client coordinates specify the upper-left and lower-right corners of the 
+     * client area. Because client coordinates are relative to the upper-left 
+     * corner of a window's client area, the coordinates of the upper-left corner 
+     * are (0,0).
+     *
+     * @param hWnd
+     *            Handle to the window.
+     * @param rect
+     *            Long pointer to a RECT structure that structure that receives 
+     *            the client coordinates. The left and top members are zero. The 
+     *            right and bottom members contain the width and height of the 
+     *            window.
+     * @return If the function succeeds, the return value is nonzero. If the
+     *         function fails, the return value is zero.
+     */
+    boolean GetClientRect(HWND hWnd, RECT rect);
+    
     /**
      * This function copies the text of the specified window's title bar - if it
      * has one - into a buffer. If the specified window is a control, the text
@@ -711,10 +740,14 @@ public interface User32 extends StdCallLibrary, WinUser, WinNT {
      * @param wMsgFilterMax
      *            Specifies the integer value of the highest message value to be
      *            retrieved.
-     * @return Nonzero indicates that the function retrieves a message other
-     *         than WM_QUIT. Zero indicates that the function retrieves the
-     *         WM_QUIT message, or that lpMsg is an invalid pointer. To get
-     *         extended error information, call GetLastError.
+     * @return If the function retrieves a message other than WM_QUIT, the
+     *         return value is nonzero.
+     *
+     * <p>If the function retrieves the WM_QUIT message, the return value is zero.</p>
+     *
+     * <p>If there is an error, the return value is -1. For example, the function
+     * fails if hWnd is an invalid window handle or lpMsg is an invalid pointer.
+     * To get extended error information, call GetLastError.</p>
      */
     int GetMessage(MSG lpMsg, HWND hWnd, int wMsgFilterMin, int wMsgFilterMax);
 
@@ -789,6 +822,46 @@ public interface User32 extends StdCallLibrary, WinUser, WinNT {
      */
     void PostMessage(HWND hWnd, int msg, WPARAM wParam, LPARAM lParam);
 
+    /**
+     * Posts a message to the message queue of the specified thread. It returns
+     * without waiting for the thread to process the message.
+     * 
+     * @param idThread The identifier of the thread to which the message is to 
+     * be posted.
+     * 
+     * <p>The function fails if the specified thread does not have a 
+     * message queue. The system creates a thread's message queue when the
+     * thread makes its first call to one of the User or GDI functions.</p>
+     * 
+     * <p>Message posting is subject to UIPI. The thread of a process can post 
+     * messages only to posted-message queues of threads in processes of lesser
+     * or equal integrity level.</p>
+     * 
+     * <p>This thread must have the SE_TCB_NAME privilege to post a message to a
+     * thread that belongs to a process with the same locally unique identifier
+     * (LUID) but is in a different desktop. Otherwise, the function fails
+     * and returns ERROR_INVALID_THREAD_ID.</p>
+     * 
+     * <p>This thread must either belong to the same desktop as the calling 
+     * thread or to a process with the same LUID. Otherwise, the function
+     * fails and returns ERROR_INVALID_THREAD_ID.</p>
+     * 
+     * @param Msg The type of message to be posted.
+     *
+     * @param wParam Additional message-specific information.
+     * 
+     * @param lParam Additional message-specific information.
+     * 
+     * @return If the function succeeds, the return value is nonzero.
+     * 
+     * <p>If the function fails, the return value is zero. To get extended error
+     * information, call GetLastError.</p><p>GetLastError returns 
+     * ERROR_INVALID_THREAD_ID if idThread is not a valid thread identifier, or
+     * if the thread specified by idThread does not have a message queue.</p>
+     * <p>GetLastError returns ERROR_NOT_ENOUGH_QUOTA when the message limit is hit.</p>
+     */
+    int PostThreadMessage(int  idThread, int  Msg, WPARAM wParam,  LPARAM lParam);
+    
     /**
      * This function indicates to Windows that a thread has made a request to
      * terminate (quit). It is typically used in response to a WM_DESTROY
@@ -1297,8 +1370,6 @@ public interface User32 extends StdCallLibrary, WinUser, WinNT {
      *         error information, call {@link Kernel32#GetLastError}.
      */
     boolean UnregisterClass(String lpClassName, HINSTANCE hInstance);
-    /** @deprecated use the String version */
-    boolean UnregisterClass(WString lpClassName, HINSTANCE hInstance);
 
     /**
      * Creates an overlapped, pop-up, or child window with an extended window
@@ -1467,11 +1538,6 @@ public interface User32 extends StdCallLibrary, WinUser, WinNT {
      *         </ul>
      */
     HWND CreateWindowEx(int dwExStyle, String lpClassName,
-                               String lpWindowName, int dwStyle, int x, int y, int nWidth,
-                               int nHeight, HWND hWndParent, HMENU hMenu, HINSTANCE hInstance,
-                               LPVOID lpParam);
-    /** @deprecated use the String version */
-    HWND CreateWindowEx(int dwExStyle, WString lpClassName,
                                String lpWindowName, int dwStyle, int x, int y, int nWidth,
                                int nHeight, HWND hWndParent, HMENU hMenu, HINSTANCE hInstance,
                                LPVOID lpParam);
@@ -1651,7 +1717,7 @@ public interface User32 extends StdCallLibrary, WinUser, WinNT {
      *         </p>
      */
     int RegisterWindowMessage(String string);
-
+    
     /**
      * Retrieves a handle to the display monitor that contains a specified point.
      * @param pt A POINT structure that specifies the point of interest in virtual-screen
@@ -1665,7 +1731,7 @@ public interface User32 extends StdCallLibrary, WinUser, WinNT {
      *        handle to that display monitor. If the point is not contained by a display monitor,
      *        the return value depends on the value of dwFlags.
      */
-    HMONITOR MonitorFromPoint(POINT pt, int dwFlags);
+    HMONITOR MonitorFromPoint(POINT.ByValue pt, int dwFlags);
 
     /**
      * Retrieves a handle to the display monitor that has the largest area of intersection with
@@ -2021,13 +2087,13 @@ public interface User32 extends StdCallLibrary, WinUser, WinNT {
      * @see <A HREF="https://msdn.microsoft.com/en-us/library/windows/desktop/ms645598(v=vs.85).aspx">GetRawInputDeviceList</A>
      */
     int GetRawInputDeviceList(RAWINPUTDEVICELIST[] pRawInputDeviceList, IntByReference puiNumDevices, int cbSize);
-    
-    
+
+
     /**
      * Retrieves a handle to the desktop window. The desktop window covers the
      * entire screen. The desktop window is the area on top of which other
      * windows are painted.
-     * 
+     *
      * @return Type: HWND The return value is a handle to the desktop window.
      */
     HWND GetDesktopWindow();
@@ -2035,7 +2101,7 @@ public interface User32 extends StdCallLibrary, WinUser, WinNT {
     /**
      * The PrintWindow function copies a visual window into the specified device
      * context (DC), typically a printer DC.
-     * 
+     *
      * @param hWnd
      *            A handle to the window that will be copied.
      * @param dest
@@ -2054,7 +2120,7 @@ public interface User32 extends StdCallLibrary, WinUser, WinNT {
     /**
      * Determines whether the specified window is enabled for mouse and keyboard
      * input.
-     * 
+     *
      * @param hWnd
      *            A handle to the window to be tested.
      * @return If the window is enabled, the return value is true (nonzero).<br>
@@ -2069,7 +2135,7 @@ public interface User32 extends StdCallLibrary, WinUser, WinNT {
      * because the window could be destroyed after this function was called.<br>
      * Further, because window handles are recycled the handle could even point
      * to a different window.
-     * 
+     *
      * @param hWnd
      *            A handle to the window to be tested.
      * @return If the window handle identifies an existing window, the return
@@ -2141,7 +2207,7 @@ public interface User32 extends StdCallLibrary, WinUser, WinNT {
 
     /**
      * Retrieves the handle to the ancestor of the specified window.
-     * 
+     *
      * @param hwnd
      *            A handle to the window whose ancestor is to be retrieved. If
      *            this parameter is the desktop window, the function returns
@@ -2165,7 +2231,7 @@ public interface User32 extends StdCallLibrary, WinUser, WinNT {
 
     /**
      * Retrieves the position of the mouse cursor, in screen coordinates.
-     * 
+     *
      * @param p
      *            lpPoint [out]<br>
      *            Type: LPPOINT<br>
@@ -2182,7 +2248,7 @@ public interface User32 extends StdCallLibrary, WinUser, WinNT {
      * If the new coordinates are not within the screen rectangle set by the
      * most recent ClipCursor function call, the system automatically adjusts
      * the coordinates so that the cursor stays within the rectangle.
-     * 
+     *
      * @param x
      *            The new x-coordinate of the cursor, in screen coordinates.
      * @param y
@@ -2277,7 +2343,7 @@ public interface User32 extends StdCallLibrary, WinUser, WinNT {
     /**
      * Removes an event hook function created by a previous call to
      * SetWinEventHook.
-     * 
+     *
      * @param hook
      *            Type: HWINEVENTHOOK<br>
      *            Handle to the event hook returned in the previous call to
@@ -2295,7 +2361,7 @@ public interface User32 extends StdCallLibrary, WinUser, WinNT {
 
     /**
      * Copies the specified icon from another module to the current module.
-     * 
+     *
      * @param hIcon
      *            A handle to the icon to be copied.
      * @return If the function succeeds, the return value is a handle to the
@@ -2313,7 +2379,7 @@ public interface User32 extends StdCallLibrary, WinUser, WinNT {
      * the GetClassLongPtr function. <br>
      * (Pointers and handles are 32 bits on 32-bit Windows and 64 bits on 64-bit
      * Windows.)
-     * 
+     *
      * @param hWnd
      *            A handle to the window and, indirectly, the class to which the
      *            window belongs.
@@ -2325,7 +2391,7 @@ public interface User32 extends StdCallLibrary, WinUser, WinNT {
      *            for example, if you specified 12 or more bytes of extra class
      *            memory, a value of 8 would be an index to the third integer.
      *            To retrieve any other value from the WNDCLASSEX structure,
-     *            specify one of the following values.<br? GCW_ATOM: -32<br>
+     *            specify one of the following values.<br> GCW_ATOM: -32<br>
      *            Retrieves an ATOM value that uniquely identifies the window
      *            class. This is the same atom that the RegisterClassEx function
      *            returns.<br>
@@ -2365,4 +2431,58 @@ public interface User32 extends StdCallLibrary, WinUser, WinNT {
      *         error information, call GetLastError.<br>
      */
     int GetClassLong(HWND hWnd, int nIndex);
+    
+    /**
+     * Registers a new clipboard format. This format can then be used as a 
+     * valid clipboard format. 
+     * 
+     * @param formatName The name of the new format. 
+     * 
+     * @return If the function succeeds, the return value identifies the 
+     * registered clipboard format.
+     * 
+     * <p> If the function fails, the return value is zero. To get extended
+     * error information, call GetLastError.</p>
+     */
+    public int RegisterClipboardFormat(String formatName);
+    
+    /**
+     * Retrieves the window handle to the active window attached to the 
+     * calling thread's message queue.
+     * 
+     * @return Type: HWND The return value is the handle to the active 
+     * window attached to the calling thread's message queue. Otherwise, 
+     * the return value is NULL.
+     */
+    public HWND GetActiveWindow();
+  
+	/**
+	 * Sends the specified message to a window or windows. 
+	 * The SendMessage function calls the window procedure for the specified window and 
+	 * does not return until the window procedure has processed the message.
+	 * 
+ 	 * To send a message and return immediately, use the SendMessageCallback or SendNotifyMessage function. 
+ 	 * To post a message to a thread's message queue and return immediately, 
+ 	 * use the PostMessage or PostThreadMessage function.
+	 * 
+	 * @param hWnd A handle to the window whose window procedure will receive the message. 
+	 * 		If this parameter is HWND_BROADCAST ((HWND)0xffff), the message is sent to all 
+	 * 		top-level windows in the system, including disabled or invisible unowned windows, 
+	 * 		overlapped windows, and pop-up windows; but the message is not sent to child windows.
+	 * 		Message sending is subject to UIPI. The thread of a process can send messages 
+	 * 		only to message queues of threads in processes of lesser or equal integrity level.
+	 * 
+	 * @param msg The message to be sent.
+	 * 		For lists of the system-provided messages, see System-Defined Messages.
+	 * @param wParam Additional message-specific information.
+	 * @param lParam Additional message-specific information.
+	 * 
+	 * @return The return value specifies the result of the message processing; it depends on the message sent.
+	 * 
+	 * Two classic usage : 
+	 *  - with a WM_USER+x msg value : wParam and lParam are numeric values
+	 *  - with a WM_COPYDATA msg value : wParam is the length of the structure and lParam a pointer to a COPYDATASTRUCT 
+	 */
+    LRESULT SendMessage(HWND hWnd, int msg, WPARAM wParam, LPARAM lParam);
+	
 }

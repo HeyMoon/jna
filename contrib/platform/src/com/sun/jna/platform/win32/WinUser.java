@@ -1,14 +1,25 @@
 /* Copyright (c) 2010 Daniel Doubrovkine, All Rights Reserved
  *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.See the GNU
- * Lesser General Public License for more details.
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
+ * 
+ * You can freely decide which license you want to apply to 
+ * the project.
+ * 
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
 package com.sun.jna.platform.win32;
 
@@ -16,12 +27,15 @@ import java.util.Arrays;
 import java.util.List;
 
 import com.sun.jna.Callback;
+import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 import com.sun.jna.Structure;
+import com.sun.jna.Structure.FieldOrder;
 import com.sun.jna.Union;
 import com.sun.jna.platform.win32.BaseTSD.ULONG_PTR;
 import com.sun.jna.platform.win32.WinNT.HANDLE;
 import com.sun.jna.win32.StdCallLibrary.StdCallCallback;
+import com.sun.jna.win32.W32APITypeMapper;
 
 /**
  * Ported from WinUser.h Microsoft Windows SDK 6.0A.
@@ -70,6 +84,8 @@ public interface WinUser extends WinDef {
     int LR_COPYFROMRESOURCE = 0x4000;
     int LR_SHARED = 0x8000;
 
+    @FieldOrder({"cbSize", "flags", "hwndActive", "hwndFocus", "hwndCapture",
+        "hwndMenuOwner", "hwndMoveSize", "hwndCaret", "rcCaret"})
     public class GUITHREADINFO extends Structure {
         public int cbSize = size();
         public int flags;
@@ -80,15 +96,11 @@ public interface WinUser extends WinDef {
         public HWND hwndMoveSize;
         public HWND hwndCaret;
         public RECT rcCaret;
-
-        @Override
-        protected List<String> getFieldOrder() {
-            return Arrays.asList(new String[] { "cbSize", "flags",
-                                                "hwndActive", "hwndFocus", "hwndCapture", "hwndMenuOwner",
-                                                "hwndMoveSize", "hwndCaret", "rcCaret" });
-        }
     }
 
+    @FieldOrder({"cbSize", "rcWindow", "rcClient", "dwStyle", "dwExStyle",
+        "dwWindowStatus", "cxWindowBorders", "cyWindowBorders", "atomWindowType",
+        "wCreatorVersion"})
     public class WINDOWINFO extends Structure {
         public int cbSize = size();
         public RECT rcWindow;
@@ -100,19 +112,12 @@ public interface WinUser extends WinDef {
         public int cyWindowBorders;
         public short atomWindowType;
         public short wCreatorVersion;
-
-        @Override
-        protected List<String> getFieldOrder() {
-            return Arrays.asList(new String[] { "cbSize", "rcWindow",
-                                                "rcClient", "dwStyle", "dwExStyle", "dwWindowStatus",
-                                                "cxWindowBorders", "cyWindowBorders", "atomWindowType",
-                                                "wCreatorVersion" });
-        }
     }
 
     /**
      * Contains information about the placement of a window on the screen.
      */
+    @FieldOrder({"length","flags","showCmd","ptMinPosition","ptMaxPosition", "rcNormalPosition"})
     public class WINDOWPLACEMENT extends Structure {
         /**
          * The coordinates of the minimized window may be specified.
@@ -169,12 +174,6 @@ public interface WinUser extends WinDef {
          * coordinates.
          */
         public RECT rcNormalPosition;
-
-        @Override
-        protected List<String> getFieldOrder() {
-            return Arrays.asList(new String[]{"length","flags","showCmd","ptMinPosition","ptMaxPosition",
-                    "rcNormalPosition"});
-        }
     }
 
     /* Get/SetWindowLong properties */
@@ -186,9 +185,9 @@ public interface WinUser extends WinDef {
     int GWL_USERDATA = -21;
     int GWL_HWNDPARENT = -8;
 
-    int DWL_DLGPROC = Pointer.SIZE;
+    int DWL_DLGPROC = Native.POINTER_SIZE;
     int DWL_MSGRESULT = 0;
-    int DWL_USER = 2*Pointer.SIZE;
+    int DWL_USER = 2*Native.POINTER_SIZE;
 
     /* Window Styles */
 
@@ -323,6 +322,7 @@ public interface WinUser extends WinDef {
     int ULW_ALPHA = 2;
     int ULW_OPAQUE = 4;
 
+    @FieldOrder({"hWnd", "message", "wParam", "lParam", "time", "pt"})
     public class MSG extends Structure {
         public HWND hWnd;
         public int message;
@@ -330,26 +330,36 @@ public interface WinUser extends WinDef {
         public LPARAM lParam;
         public int time;
         public POINT pt;
-
-        @Override
-        protected List<String> getFieldOrder() {
-            return Arrays.asList(new String[] { "hWnd", "message", "wParam",
-                                                "lParam", "time", "pt" });
-        }
     }
 
+    /**
+     * Contains data to be passed to another application by the WM_COPYDATA message.
+     */
+    @FieldOrder({"dwData", "cbData", "lpData"})
+    public class COPYDATASTRUCT extends Structure {
+
+		public COPYDATASTRUCT() {
+			super();
+		}
+
+		public COPYDATASTRUCT(Pointer p) {
+			super(p);
+			//Receiving data and read it from native memory to fill the structure.
+			read();
+		}
+
+		public ULONG_PTR dwData;
+		public int cbData;
+		public Pointer lpData;
+	}
+
+    @FieldOrder({"cbSize", "hWnd", "dwFlags", "uCount", "dwTimeout"})
     public class FLASHWINFO extends Structure {
         public int cbSize = size();
         public HANDLE hWnd;
         public int dwFlags;
         public int uCount;
         public int dwTimeout;
-
-        @Override
-        protected List<String> getFieldOrder() {
-            return Arrays.asList(new String[] { "cbSize", "hWnd", "dwFlags",
-                                                "uCount", "dwTimeout" });
-        }
     }
 
     public interface WNDENUMPROC extends StdCallCallback {
@@ -416,8 +426,9 @@ public interface WinUser extends WinDef {
         void callback(HANDLE hWinEventHook, DWORD event, HWND hwnd, LONG idObject, LONG idChild, DWORD dwEventThread,
                 DWORD dwmsEventTime);
     }
-    
+
     /** Specifies the width and height of a rectangle. */
+    @FieldOrder({"cx", "cy"})
     public class SIZE extends Structure {
         public int cx, cy;
 
@@ -428,11 +439,6 @@ public interface WinUser extends WinDef {
             this.cx = w;
             this.cy = h;
         }
-
-        @Override
-        protected List<String> getFieldOrder() {
-            return Arrays.asList(new String[] { "cx", "cy" });
-        }
     }
 
     int AC_SRC_OVER = 0x00;
@@ -440,17 +446,12 @@ public interface WinUser extends WinDef {
     int AC_SRC_NO_PREMULT_ALPHA = 0x01;
     int AC_SRC_NO_ALPHA = 0x02;
 
+    @FieldOrder({"BlendOp", "BlendFlags", "SourceConstantAlpha", "AlphaFormat"})
     public class BLENDFUNCTION extends Structure {
         public byte BlendOp = AC_SRC_OVER; // only valid value
         public byte BlendFlags = 0; // only valid value
         public byte SourceConstantAlpha;
         public byte AlphaFormat;
-
-        @Override
-        protected List<String> getFieldOrder() {
-            return Arrays.asList(new String[] { "BlendOp", "BlendFlags",
-                                                "SourceConstantAlpha", "AlphaFormat" });
-        }
     }
 
     int VK_SHIFT = 16;
@@ -470,6 +471,7 @@ public interface WinUser extends WinDef {
     int MOD_WIN = 0x0008;
 
     int WH_KEYBOARD = 2;
+    int WH_CALLWNDPROC = 4;
     int WH_MOUSE = 7;
     int WH_KEYBOARD_LL = 13;
     int WH_MOUSE_LL = 14;
@@ -477,6 +479,28 @@ public interface WinUser extends WinDef {
     public class HHOOK extends HANDLE { }
 
     public interface HOOKPROC extends StdCallCallback { }
+
+    /**
+     * Defines the message parameters passed to a WH_CALLWNDPROC hook procedure, CallWndProc.
+     */
+    @FieldOrder({"lParam", "wParam", "message", "hwnd"})
+    public class CWPSTRUCT extends Structure {
+
+    	public CWPSTRUCT() {
+    		super();
+		}
+
+		public CWPSTRUCT(Pointer p) {
+			super(p);
+			//Receiving data and read it from native memory to fill the structure.
+			read();
+		}
+
+		public LPARAM lParam;
+		public WPARAM wParam;
+		public int message;
+		public HWND hwnd;
+    }
 
     /**
      * The WM_PAINT message is sent when the system or another application makes
@@ -541,6 +565,17 @@ public interface WinUser extends WinDef {
      * associated with the thread that registered the hot key.
      */
     int WM_HOTKEY = 0x0312;
+    
+    /**
+     * Used to define private messages for use by private window classes,
+     * usually of the form WM_USER+x, where x is an integer value.
+     */
+    int WM_USER = 0x0400;
+    
+    /**
+     * An application sends the WM_COPYDATA message to pass data to another application.
+     */
+    int WM_COPYDATA = 0x004A;
 
     int WM_KEYUP = 257;
     int WM_SYSKEYDOWN = 260;
@@ -577,18 +612,13 @@ public interface WinUser extends WinDef {
      */
     int ICON_SMALL2 = 2;
 
+    @FieldOrder({"vkCode", "scanCode", "flags", "time", "dwExtraInfo"})
     public class KBDLLHOOKSTRUCT extends Structure {
         public int vkCode;
         public int scanCode;
         public int flags;
         public int time;
         public ULONG_PTR dwExtraInfo;
-
-        @Override
-        protected List<String> getFieldOrder() {
-            return Arrays.asList(new String[] { "vkCode", "scanCode", "flags",
-                                                "time", "dwExtraInfo" });
-        }
     }
 
     /* System Metrics */
@@ -787,10 +817,96 @@ public interface WinUser extends WinDef {
     int GW_ENABLEDPOPUP = 6;
 
     /**
+     * If the calling thread and the thread that owns the window are attached 
+     * to different input queues, the system posts the request to the thread 
+     * that owns the window. This prevents the calling thread from blocking 
+     * its execution while other threads process the request.
+     */
+    int SWP_ASYNCWINDOWPOS = 0x4000; 
+    		
+    /**
+     * Prevents generation of the WM_SYNCPAINT message.
+     */
+    int SWP_DEFERERASE = 0x2000;
+    
+    /**
+     * Draws a frame (defined in the window's class description) around the window.
+     */
+    int SWP_DRAWFRAME = 0x0020;
+    
+    /**
+     * Applies new frame styles set using the SetWindowLong function. Sends 
+     * a WM_NCCALCSIZE message to the window, even if the window's size is 
+     * not being changed. If this flag is not specified, WM_NCCALCSIZE is 
+     * sent only when the window's size is being changed.
+     */
+    int SWP_FRAMECHANGED = 0x0020;
+    
+    /**
+     * Hides the window.
+     */
+    int SWP_HIDEWINDOW = 0x0080;
+    
+    /**
+     * Does not activate the window. If this flag is not set, the window is 
+     * activated and moved to the top of either the topmost or non-topmost 
+     * group (depending on the setting of the hWndInsertAfter parameter).
+     */
+    int SWP_NOACTIVATE = 0x0010;
+    
+    /**
+     * Discards the entire contents of the client area. If this flag is not 
+     * specified, the valid contents of the client area are saved and copied 
+     * back into the client area after the window is sized or repositioned.
+     */
+    int SWP_NOCOPYBITS = 0x0100;
+    
+    /**
+     * Retains the current position (ignores X and Y parameters).
+     */
+    int SWP_NOMOVE = 0x0002;
+    
+    /**
+     * Does not change the owner window's position in the Z order.
+     */
+    int SWP_NOOWNERZORDER = 0x0200;
+    
+    /**
+     * Does not redraw changes. If this flag is set, no repainting of any kind
+     *  occurs. This applies to the client area, the nonclient area (including
+     *   the title bar and scroll bars), and any part of the parent window 
+     *   uncovered as a result of the window being moved. When this flag is 
+     *   set, the application must explicitly invalidate or redraw any parts
+     *   of the window and parent window that need redrawing.
+     */
+    int SWP_NOREDRAW = 0x0008;
+    
+    /**
+     * Same as the SWP_NOOWNERZORDER flag.
+     */
+    int SWP_NOREPOSITION = 0x0200;
+    
+    /**
+     * Used by User32.SetWindowPos. <br>
+     * Prevents the window from receiving the WM_WINDOWPOSCHANGING message.
+     */
+    int SWP_NOSENDCHANGING = 0x0400;
+    
+    /**
+     * Retains the current size (ignores the cx and cy parameters).
+     */
+    int SWP_NOSIZE = 0x0001;
+    		
+    /**
      * Retains the current Z order (ignores the hWndInsertAfter parameter).
      */
     int SWP_NOZORDER = 0x0004;
 
+    /**
+     * Displays the window.
+     */
+    int SWP_SHOWWINDOW = 0x0040;
+    
     /**
      * Minimizes the window.
      */
@@ -912,18 +1028,13 @@ public interface WinUser extends WinDef {
      * BS_RIGHTBUTTON style.
      */
     int BS_LEFTTEXT                    = 0x00000020;
-    
-    /**
-     * Used by User32.SetWindowPos. <br>
-     * Prevents the window from receiving the WM_WINDOWPOSCHANGING message.
-     */
-    int SWP_NOSENDCHANGING             = 0x0400;
-    
-    
+
+
     /**
      * Contains information about a simulated message generated by an input
      * device other than a keyboard or mouse.
      */
+    @FieldOrder({"uMsg", "wParamL", "wParamH"})
     public static class HARDWAREINPUT extends Structure {
 
         public static class ByReference extends HARDWAREINPUT implements
@@ -947,17 +1058,13 @@ public interface WinUser extends WinDef {
         public WinDef.DWORD uMsg;
         public WinDef.WORD wParamL;
         public WinDef.WORD wParamH;
-
-        @Override
-        protected List<String> getFieldOrder() {
-            return Arrays.asList(new String[] { "uMsg", "wParamL", "wParamH" });
-        }
     }
 
     /**
      * Used by SendInput to store information for synthesizing input events such
      * as keystrokes, mouse movement, and mouse clicks.
      */
+    @FieldOrder({"type", "input"})
     public static class INPUT extends Structure {
 
         public static final int INPUT_MOUSE = 0;
@@ -985,11 +1092,6 @@ public interface WinUser extends WinDef {
         public WinDef.DWORD type;
         public INPUT_UNION input = new INPUT_UNION();
 
-        @Override
-        protected List<String> getFieldOrder() {
-            return Arrays.asList(new String[] { "type", "input" });
-        }
-
         public static class INPUT_UNION extends Union {
 
             public INPUT_UNION() {
@@ -1009,6 +1111,7 @@ public interface WinUser extends WinDef {
     /**
      * Contains information about a simulated keyboard event.
      */
+    @FieldOrder({"wVk", "wScan", "dwFlags", "time", "dwExtraInfo"})
     public static class KEYBDINPUT extends Structure {
 
         /**
@@ -1083,17 +1186,12 @@ public interface WinUser extends WinDef {
          * GetMessageExtraInfo function to obtain this information.
          */
         public BaseTSD.ULONG_PTR dwExtraInfo;
-
-        @Override
-        protected List<String> getFieldOrder() {
-            return Arrays.asList(new String[] { "wVk", "wScan", "dwFlags",
-                                                "time", "dwExtraInfo" });
-        }
     }
 
     /**
      * Contains information about a simulated mouse event.
      */
+    @FieldOrder({"dx", "dy", "mouseData", "dwFlags", "time", "dwExtraInfo"})
     public static class MOUSEINPUT extends Structure {
 
         public static class ByReference extends MOUSEINPUT implements
@@ -1120,27 +1218,17 @@ public interface WinUser extends WinDef {
         public WinDef.DWORD dwFlags;
         public WinDef.DWORD time;
         public BaseTSD.ULONG_PTR dwExtraInfo;
-
-        @Override
-        protected List<String> getFieldOrder() {
-            return Arrays.asList(new String[] { "dx", "dy", "mouseData",
-                                                "dwFlags", "time", "dwExtraInfo" });
-        }
     }
 
     /**
      * Contains the time of the last input.
      */
+    @FieldOrder({"cbSize", "dwTime"})
     public static class LASTINPUTINFO extends Structure {
         public int cbSize = size();
 
         // Tick count of when the last input event was received.
         public int dwTime;
-
-        @Override
-        protected List<String> getFieldOrder() {
-            return Arrays.asList(new String[] { "cbSize", "dwTime" });
-        }
     }
 
     /**
@@ -1152,6 +1240,9 @@ public interface WinUser extends WinDef {
      * the size of the structure, and the hIconSm member, which contains a
      * handle to a small icon associated with the window class.
      */
+    @FieldOrder({"cbSize", "style", "lpfnWndProc", "cbClsExtra", "cbWndExtra",
+        "hInstance", "hIcon", "hCursor", "hbrBackground", "lpszMenuName",
+        "lpszClassName", "hIconSm"})
     public class WNDCLASSEX extends Structure {
 
         /**
@@ -1165,6 +1256,7 @@ public interface WinUser extends WinDef {
          * Instantiates a new wndclassex.
          */
         public WNDCLASSEX() {
+            super(W32APITypeMapper.DEFAULT);
         }
 
         /**
@@ -1174,7 +1266,7 @@ public interface WinUser extends WinDef {
          *            the memory
          */
         public WNDCLASSEX(Pointer memory) {
-            super(memory);
+            super(memory, Structure.ALIGN_DEFAULT, W32APITypeMapper.DEFAULT);
             read();
         }
 
@@ -1213,14 +1305,6 @@ public interface WinUser extends WinDef {
 
         /** The h icon sm. */
         public HICON hIconSm;
-
-        @Override
-        protected List<String> getFieldOrder() {
-            return Arrays.asList(new String[] { "cbSize", "style",
-                                                "lpfnWndProc", "cbClsExtra", "cbWndExtra", "hInstance",
-                                                "hIcon", "hCursor", "hbrBackground", "lpszMenuName",
-                                                "lpszClassName", "hIconSm" });
-        }
     }
 
     /**
@@ -1314,12 +1398,12 @@ public interface WinUser extends WinDef {
 
     /**
      * <p>The MONITORINFO structure contains information about a display monitor.</p><p>
-     * The {@link User32#GetMonitorInfo} function stores 
+     * The {@link User32#GetMonitorInfo} function stores
      * information into a MONITORINFO structure</p>
-     * The MONITORINFO structure is a subset of the MONITORINFOEX structure.      
+     * The MONITORINFO structure is a subset of the MONITORINFOEX structure.
      */
-    public class MONITORINFO extends Structure
-    {
+    @FieldOrder({"cbSize", "rcMonitor", "rcWork", "dwFlags"})
+    public class MONITORINFO extends Structure {
         /**
          * The size, in bytes, of the structure.
          */
@@ -1347,23 +1431,17 @@ public interface WinUser extends WinDef {
          * <ul><li>MONITORINFOF_PRIMARY</li></ul>
          */
         public int     dwFlags;
-
-        @Override
-        protected List<String> getFieldOrder()
-        {
-            return Arrays.asList("cbSize", "rcMonitor", "rcWork", "dwFlags");
-        }
     }
 
     /**
      * <p>The MONITORINFOEX structure contains information about a display monitor.</p><p>
-     * The {@link User32#GetMonitorInfo} function stores 
+     * The {@link User32#GetMonitorInfo} function stores
      * information into a MONITORINFOEX structure</p>
-     * The MONITORINFOEX structure is a superset of the MONITORINFO structure. 
-     * The MONITORINFOEX structure adds a string member to contain a name for the display monitor. 
+     * The MONITORINFOEX structure is a superset of the MONITORINFO structure.
+     * The MONITORINFOEX structure adds a string member to contain a name for the display monitor.
      */
-    public class MONITORINFOEX extends Structure
-    {
+    @FieldOrder({"cbSize", "rcMonitor", "rcWork", "dwFlags", "szDevice"})
+    public class MONITORINFOEX extends Structure {
         /**
          * The size, in bytes, of the structure.
          */
@@ -1399,35 +1477,28 @@ public interface WinUser extends WinDef {
          */
         public char[]  szDevice;
 
-        public MONITORINFOEX()
-        {
+        public MONITORINFOEX() {
             szDevice = new char[CCHDEVICENAME];
             cbSize = size();
-        }
-
-        @Override
-        protected List<String> getFieldOrder()
-        {
-            return Arrays.asList("cbSize", "rcMonitor", "rcWork", "dwFlags", "szDevice");
         }
     }
 
     /**
      * An application-defined callback function that is called by the {@link User32#EnumDisplayMonitors} function.
      * <p>
-     * You can use the EnumDisplayMonitors function to enumerate the set of display monitors that intersect 
-     * the visible region of a specified device context and, optionally, a clipping rectangle. To do this, 
+     * You can use the EnumDisplayMonitors function to enumerate the set of display monitors that intersect
+     * the visible region of a specified device context and, optionally, a clipping rectangle. To do this,
      * set the hdc parameter to a non-NULL value, and set the lprcClip parameter as needed.
      * </p><p>
-     * You can also use the EnumDisplayMonitors function to enumerate one or more of the display monitors on 
-     * the desktop, without supplying a device context. To do this, set the hdc parameter of 
+     * You can also use the EnumDisplayMonitors function to enumerate one or more of the display monitors on
+     * the desktop, without supplying a device context. To do this, set the hdc parameter of
      * EnumDisplayMonitors to NULL and set the lprcClip parameter as needed.
      * </p>
-     * In all cases, EnumDisplayMonitors calls a specified MonitorEnumProc function once for each display 
-     * monitor in the calculated enumeration set. The MonitorEnumProc function always receives a handle to 
-     * the display monitor. If the hdc parameter of EnumDisplayMonitors is non-NULL, the MonitorEnumProc 
-     * function also receives a handle to a device context whose color format is appropriate for the 
-     * display monitor. You can then paint into the device context in a manner that is optimal for the 
+     * In all cases, EnumDisplayMonitors calls a specified MonitorEnumProc function once for each display
+     * monitor in the calculated enumeration set. The MonitorEnumProc function always receives a handle to
+     * the display monitor. If the hdc parameter of EnumDisplayMonitors is non-NULL, the MonitorEnumProc
+     * function also receives a handle to a device context whose color format is appropriate for the
+     * display monitor. You can then paint into the device context in a manner that is optimal for the
      * display monitor.
      */
     public interface MONITORENUMPROC extends StdCallCallback
@@ -1496,25 +1567,25 @@ public interface WinUser extends WinDef {
     /* GetAncestor properties */
     /**
      * Retrieves the parent window. This does not include the owner, as it does with the GetParent function.
-     * 
+     *
      * @see <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/ms633502(v=vs.85).aspx">MSDN</a>
      */
     int GA_PARENT = 1;
-    
+
     /**
      * Retrieves the root window by walking the chain of parent windows.
-     * 
+     *
      * @see <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/ms633502(v=vs.85).aspx">MSDN</a>
      */
     int GA_ROOT = 2;
-    
+
     /**
      * Retrieves the owned root window by walking the chain of parent and owner windows returned by GetParent.
-     * 
+     *
      * @see <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/ms633502(v=vs.85).aspx">MSDN</a>
      */
     int GA_ROOTOWNER = 3;
-    
+
     /* GetClassLong properties */
     /**
      * Retrieves an ATOM value that uniquely identifies the window class. This
@@ -1524,18 +1595,18 @@ public interface WinUser extends WinDef {
 
     /**
      * Retrieves a handle to the icon associated with the class.
-     * 
+     *
      * @see <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/ms633588(v=vs.85).aspx">MSDN</a>
      */
     int GCL_HICON = -14;
 
     /**
      * Retrieves a handle to the small icon associated with the class.
-     * 
+     *
      * @see <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/ms633588(v=vs.85).aspx">MSDN</a>
      */
     int GCL_HICONSM = -34;
-    
+
     /**
      * Retrieves the size, in bytes, of the extra memory associated with the
      * class.
@@ -1739,6 +1810,7 @@ public interface WinUser extends WinDef {
      * Contains information about a raw input device.
      * @see <A HREF="https://msdn.microsoft.com/en-us/library/windows/desktop/ms645568(v=vs.85).aspx"></A>
      */
+    @FieldOrder({"hDevice", "dwType"})
     public class RAWINPUTDEVICELIST extends Structure {
         public HANDLE hDevice;
         public int dwType;
@@ -1756,13 +1828,177 @@ public interface WinUser extends WinDef {
         }
 
         @Override
-        protected List<String> getFieldOrder() {
-            return Arrays.asList("hDevice", "dwType");
-        }
-
-        @Override
         public String toString() {
             return "hDevice=" + hDevice + ", dwType=" + dwType;
         }
     }
+
+    /**
+     * A handle to a bitmap (HBITMAP).
+     */
+    public int CF_BITMAT = 2;
+    /**
+     * A memory object containing a BITMAPINFO structure followed by the bitmap
+     * bits.
+     */
+    public int CF_DIB = 8;
+    /**
+     * A memory object containing a BITMAPV5HEADER structure followed by the
+     * bitmap color space information and the bitmap bits.
+     */
+    public int CF_DIBV5 = 17;
+    /**
+     * Software Arts' Data Interchange Format.
+     */
+    public int CF_DIF = 5;
+    /**
+     * Bitmap display format associated with a private format. The hMem
+     * parameter must be a handle to data that can be displayed in bitmap format
+     * in lieu of the privately formatted data.
+     */
+    public int CF_DSPBITMAP = 0x0082;
+    /**
+     * Enhanced metafile display format associated with a private format. The
+     * hMem parameter must be a handle to data that can be displayed in enhanced
+     * metafile format in lieu of the privately formatted data.
+     */
+    public int CF_DSPENHMETAFILE = 0x008E;
+    /**
+     * Metafile-picture display format associated with a private format. The
+     * hMem parameter must be a handle to data that can be displayed in
+     * metafile-picture format in lieu of the privately formatted data.
+     */
+    public int CF_DSPMETAFILEPICT = 0x0083;
+    /**
+     * Text display format associated with a private format. The hMem parameter
+     * must be a handle to data that can be displayed in text format in lieu of
+     * the privately formatted data.
+     */
+    public int CF_DSPTEXT = 0x0081;
+    /**
+     * A handle to an enhanced metafile (HENHMETAFILE).
+     */
+    public int CF_ENHMETAFILE = 14;
+    /**
+     * Start of a range of integer values for application-defined GDI object
+     * clipboard formats. The end of the range is CF_GDIOBJLAST.
+     *
+     * <p>
+     * Handles associated with clipboard formats in this range are not
+     * automatically deleted using the GlobalFree function when the clipboard is
+     * emptied. Also, when using values in this range, the hMem parameter is not
+     * a handle to a GDI object, but is a handle allocated by the GlobalAlloc
+     * function with the GMEM_MOVEABLE flag.</p>
+     */
+    public int CF_GDIOBJFIRST = 0x0300;
+    /**
+     * @see WinUser#CF_GDIOBJFIRST
+     */
+    public int CF_GDIOBJLAST = 0x03FF;
+    /**
+     * A handle to type HDROP that identifies a list of files. An application
+     * can retrieve information about the files by passing the handle to the
+     * DragQueryFile function.
+     */
+    public int CF_HDROP = 15;
+    /**
+     * The data is a handle to the locale identifier associated with text in the
+     * clipboard. When you close the clipboard, if it contains CF_TEXT data but
+     * no CF_LOCALE data, the system automatically sets the CF_LOCALE format to
+     * the current input language. You can use the CF_LOCALE format to associate
+     * a different locale with the clipboard text.
+     *
+     * <p>
+     * An application that pastes text from the clipboard can retrieve this
+     * format to determine which character set was used to generate the
+     * text.</p>
+     * <p>
+     * Note that the clipboard does not support plain text in multiple character
+     * sets. To achieve this, use a formatted text data type such as RTF
+     * instead.</p>
+     * <p>
+     * The system uses the code page associated with CF_LOCALE to implicitly
+     * convert from CF_TEXT to CF_UNICODETEXT. Therefore, the correct code page
+     * table is used for the conversion.</p>
+     */
+    public int CF_LOCALE = 16;
+    /**
+     * Handle to a metafile picture format as defined by the METAFILEPICT
+     * structure. When passing a CF_METAFILEPICT handle by means of DDE, the
+     * application responsible for deleting hMem should also free the metafile
+     * referred to by the CF_METAFILEPICT handle.
+     */
+    public int CF_METAFILEPICT = 3;
+    /**
+     * Text format containing characters in the OEM character set. Each line
+     * ends with a carriage return/linefeed (CR-LF) combination. A null
+     * character signals the end of the data.
+     */
+    public int CF_OEMTEXT = 7;
+    /**
+     * Owner-display format. The clipboard owner must display and update the
+     * clipboard viewer window, and receive the WM_ASKCBFORMATNAME,
+     * WM_HSCROLLCLIPBOARD, WM_PAINTCLIPBOARD, WM_SIZECLIPBOARD, and
+     * WM_VSCROLLCLIPBOARD messages. The hMem parameter must be NULL.
+     */
+    public int CF_OWNERDISPLAY = 0x0080;
+    /**
+     * Handle to a color palette. Whenever an application places data in the
+     * clipboard that depends on or assumes a color palette, it should place the
+     * palette on the clipboard as well.
+     *
+     * <p>
+     * If the clipboard contains data in the CF_PALETTE (logical color palette)
+     * format, the application should use the SelectPalette and RealizePalette
+     * functions to realize (compare) any other data in the clipboard against
+     * that logical palette.</p>
+     *<p>
+     * When displaying clipboard data, the clipboard always uses as its current
+     * palette any object on the clipboard that is in the CF_PALETTE format.</p>
+     */
+    public int CF_PALETTE = 9;
+    /**
+     * Data for the pen extensions to the Microsoft Windows for Pen Computing.
+     */
+    public int CF_PENDATA = 10;
+    /**
+     * Start of a range of integer values for private clipboard formats. The
+     * range ends with CF_PRIVATELAST. Handles associated with private clipboard
+     * formats are not freed automatically; the clipboard owner must free such
+     * handles, typically in response to the WM_DESTROYCLIPBOARD message.
+     */
+    public int CF_PRIVATEFIRST = 0x0200;
+    /**
+     * @see WinUser#CF_PRIVATEFIRST
+     */
+    public int CF_PRIVATELAST = 0x02FF;
+    /**
+     * Represents audio data more complex than can be represented in a CF_WAVE
+     * standard wave format.
+     */
+    public int CF_RIFF = 11;
+    /**
+     * Microsoft Symbolic Link (SYLK) format.
+     */
+    public int CF_SYLK = 4;
+    /**
+     * Text format. Each line ends with a carriage return/linefeed (CR-LF)
+     * combination. A null character signals the end of the data. Use this
+     * format for ANSI text.
+     */
+    public int CF_TEXT = 1;
+    /**
+     * Tagged-image file format.
+     */
+    public int CF_TIFF = 6;
+    /**
+     * Unicode text format. Each line ends with a carriage return/linefeed
+     * (CR-LF) combination. A null character signals the end of the data.
+     */
+    public int CF_UNICODETEXT = 13;
+    /**
+     * Represents audio data in one of the standard wave formats, such as 11 kHz
+     * or 22 kHz PCM.
+     */
+    public int CF_WAVE = 12;
 }

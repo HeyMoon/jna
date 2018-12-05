@@ -1,14 +1,25 @@
 /* Copyright (c) 2007-20013 Timothy Wall, All Rights Reserved
  *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
+ * 
+ * You can freely decide which license you want to apply to 
+ * the project.
+ * 
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
 package com.sun.jna;
 
@@ -36,7 +47,7 @@ public class LibraryLoadTest extends TestCase implements Paths {
     }
 
     public void testLoadJNALibrary() {
-        assertTrue("Pointer size should never be zero", Pointer.SIZE > 0);
+        assertTrue("Pointer size should never be zero", Native.POINTER_SIZE > 0);
     }
 
     public void testLoadJAWT() {
@@ -54,7 +65,7 @@ public class LibraryLoadTest extends TestCase implements Paths {
 
         if (GraphicsEnvironment.isHeadless()) return;
 
-        if (Pointer.SIZE > 0) {
+        if (Native.POINTER_SIZE > 0) {
             Toolkit.getDefaultToolkit();
         }
     }
@@ -113,15 +124,15 @@ public class LibraryLoadTest extends TestCase implements Paths {
     }
 
     private Object load() {
-        return Native.loadLibrary(Platform.C_LIBRARY_NAME, CLibrary.class);
+        return Native.load(Platform.C_LIBRARY_NAME, CLibrary.class);
     }
 
     public void testLoadProcess() {
-        Native.loadLibrary(CLibrary.class);
+        Native.load(CLibrary.class);
     }
 
     public void testLoadProcessWithOptions() {
-        Native.loadLibrary(CLibrary.class, Collections.EMPTY_MAP);
+        Native.load(CLibrary.class, Collections.EMPTY_MAP);
     }
 
     public void testLoadCLibrary() {
@@ -255,7 +266,7 @@ public class LibraryLoadTest extends TestCase implements Paths {
     // dependent libraries in the same directory as the original
     public void testLoadDependentLibraryWithAlteredSearchPath() {
         try {
-            TestLib2 lib = Native.loadLibrary("testlib2", TestLib2.class);
+            TestLib2 lib = Native.load("testlib2", TestLib2.class);
             lib.dependentReturnFalse();
         }
         catch(UnsatisfiedLinkError e) {
@@ -271,7 +282,7 @@ public class LibraryLoadTest extends TestCase implements Paths {
     public void testLoadProperCLibraryVersion() {
         if (Platform.isWindows()) return;
 
-        CLibrary lib = Native.loadLibrary("c", CLibrary.class);
+        CLibrary lib = Native.load("c", CLibrary.class);
         assertNotNull("Couldn't get current user",
                       lib.getpwuid(lib.geteuid()));
     }

@@ -1,14 +1,25 @@
 /* Copyright (c) 2007 Timothy Wall, All Rights Reserved
  *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- * <p/>
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
+ * 
+ * You can freely decide which license you want to apply to 
+ * the project.
+ * 
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
 package com.sun.jna;
 
@@ -44,7 +55,7 @@ public class ArgumentsMarshalTest extends TestCase {
             public double doubleField;
 
             @Override
-            public List getFieldOrder() {
+            public List<String> getFieldOrder() {
                 return Arrays.asList(new String[] { "int8Field", "int16Field", "int32Field", "int64Field", "floatField", "doubleField" });
             }
             public CheckFieldAlignment() {
@@ -98,6 +109,12 @@ public class ArgumentsMarshalTest extends TestCase {
         int fillFloatBuffer(float[] buf, int len, float value);
         int fillDoubleBuffer(double[] buf, int len, double value);
 
+        // boolean[] maps to jboolean* (always 8-bit), boolean mapping is 32-bit by default; use byte
+        int fillInt8Buffer(boolean[] buf, int len, byte value);
+
+        // char[] maps to jchar* (always 16-bit), char maps to wchar_t (can be 32-bit); use short
+        int fillInt16Buffer(char[] buf, int len, short value);
+
         // Nonexistent functions
         boolean returnBooleanArgument(Object arg);
 
@@ -105,7 +122,7 @@ public class ArgumentsMarshalTest extends TestCase {
         class MinTestStructure extends Structure {
             public int field;
             @Override
-            protected List getFieldOrder() {
+            protected List<String> getFieldOrder() {
                 return Arrays.asList(new String[] { "field" });
             }
         }
@@ -115,7 +132,7 @@ public class ArgumentsMarshalTest extends TestCase {
             public int length;
             public byte[] buffer;
             @Override
-            protected List getFieldOrder() {
+            protected List<String> getFieldOrder() {
                 return Arrays.asList(new String[] { "length", "buffer" });
             }
             public VariableSizedStructure(String arg) {
@@ -131,7 +148,7 @@ public class ArgumentsMarshalTest extends TestCase {
             }
             public TestCallback cb;
             @Override
-            protected List getFieldOrder() {
+            protected List<String> getFieldOrder() {
                 return Arrays.asList(new String[] { "cb" });
             }
         }
@@ -141,7 +158,7 @@ public class ArgumentsMarshalTest extends TestCase {
     TestLibrary lib;
     @Override
     protected void setUp() {
-        lib = Native.loadLibrary("testlib", TestLibrary.class);
+        lib = Native.load("testlib", TestLibrary.class);
     }
 
     @Override
@@ -264,6 +281,7 @@ public class ArgumentsMarshalTest extends TestCase {
         long returnInt64Argument(size_t arg);
     }
     public static class size_t extends IntegerType {
+        private static final long serialVersionUID = 1L;
         public size_t() {
             this(0);
         }
@@ -283,16 +301,16 @@ public class ArgumentsMarshalTest extends TestCase {
             return new Custom(((Integer)nativeValue).intValue());
         }
         @Override
-        public Class nativeType() {
+        public Class<?> nativeType() {
             return Integer.class;
         }
         @Override
         public Object toNative() {
-            return new Integer(value);
+            return Integer.valueOf(value);
         }
     }
     protected NativeMappedLibrary loadNativeMappedLibrary() {
-        return Native.loadLibrary("testlib", NativeMappedLibrary.class);
+        return Native.load("testlib", NativeMappedLibrary.class);
     }
     public void testNativeMappedArgument() {
         NativeMappedLibrary lib = loadNativeMappedLibrary();
@@ -381,7 +399,7 @@ public class ArgumentsMarshalTest extends TestCase {
             public Pointer[] parray = new Pointer[2];
             public byte[] barray = new byte[2];
             @Override
-            protected List getFieldOrder() {
+            protected List<String> getFieldOrder() {
                 return Arrays.asList(new String[] { "b", "c", "s", "i", "j", "f", "d", "parray", "barray" });
             }
         }
@@ -495,11 +513,35 @@ public class ArgumentsMarshalTest extends TestCase {
         }
     }
 
+    public void testBooleanArrayArgument() {
+        boolean[] buf = new boolean[1024];
+        assertEquals("Wrong return value", buf.length,
+                     lib.fillInt8Buffer(buf, buf.length, (byte)1));
+        for (int i=0;i < buf.length;i++) {
+            assertTrue("Bad value at index " + i, buf[i]);
+        }
+        assertEquals("Wrong return value", buf.length,
+                     lib.fillInt8Buffer(buf, buf.length, (byte)0));
+        for (int i=0;i < buf.length;i++) {
+            assertFalse("Bad value at index " + i, buf[i]);
+        }
+    }
+
     public void testByteArrayArgument() {
         byte[] buf = new byte[1024];
         final byte MAGIC = (byte)0xED;
         assertEquals("Wrong return value", buf.length,
                      lib.fillInt8Buffer(buf, buf.length, MAGIC));
+        for (int i=0;i < buf.length;i++) {
+            assertEquals("Bad value at index " + i, MAGIC, buf[i]);
+        }
+    }
+
+    public void testCharArrayArgument() {
+        char[] buf = new char[1024];
+        final char MAGIC = '\uFEFF';
+        assertEquals("Wrong return value", buf.length,
+                     lib.fillInt16Buffer(buf, buf.length, (short)MAGIC));
         for (int i=0;i < buf.length;i++) {
             assertEquals("Bad value at index " + i, MAGIC, buf[i]);
         }

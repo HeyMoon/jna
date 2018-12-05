@@ -5,16 +5,31 @@
  * Copyright (c) 2007-2013 Timothy Wall. All Rights Reserved.
  * Copyright (c) 2007 Wayne Meissner. All Rights Reserved.
  *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- * <p/>
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
+ * 
+ * You can freely decide which license you want to apply to 
+ * the project.
+ * 
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
+
+#include "dispatch.h"
+
+#include <string.h>
 
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
@@ -45,6 +60,7 @@
 #else
 #include <dlfcn.h>
 #include <errno.h>
+#include <assert.h>
 #define STRTYPE char*
 #ifdef USE_DEFAULT_LIBNAME_ENCODING
 #define NAME2CSTR(ENV,JSTR) newCString(ENV,JSTR)
@@ -53,8 +69,21 @@
 #endif
 #define DEFAULT_LOAD_OPTS (RTLD_LAZY|RTLD_GLOBAL)
 #define LOAD_LIBRARY(NAME,OPTS) dlopen(NAME, OPTS)
-#define LOAD_ERROR(BUF,LEN) (snprintf(BUF, LEN, "%s", dlerror()), BUF)
-#define STR_ERROR(CODE,BUF,LEN) (strerror_r(CODE, BUF, LEN), BUF)
+static inline char * LOAD_ERROR(char * buf, size_t len) {
+    const size_t count = snprintf(buf, len, "%s", dlerror());
+    assert(count <= len && "snprintf() output has been truncated");
+    return buf;
+}
+static inline char * STR_ERROR(int code, char * buf, size_t len) {
+    // The conversion will fail if code is not a valid error code.
+    int err = strerror_r(code, buf, len);
+    if (err)
+        // Depending on glib version, "Unknown error" error code
+        // may be returned or passed using errno.
+        err = strerror_r(err > 0 ? err : errno, buf, len);
+    assert(err == 0 && "strerror_r() conversion has failed");
+    return buf;
+}
 #define FREE_LIBRARY(HANDLE) dlclose(HANDLE)
 #define FIND_ENTRY(HANDLE, NAME) dlsym(HANDLE, NAME)
 #endif
@@ -67,15 +96,8 @@
 #endif
 
 #include <stdlib.h>
-// Force XSI-compliant strerror_r (http://unixhelp.ed.ac.uk/CGI/man-cgi?strerror)
-#ifndef _XOPEN_SOURCE
-#define _XOPEN_SOURCE 600
-#endif
-#include <string.h>
 #include <wchar.h>
 #include <jni.h>
-
-#include "dispatch.h"
 
 #ifndef NO_JAWT
 #include <jawt.h>
@@ -97,6 +119,8 @@ static int _protect;
 
 #ifdef __cplusplus
 extern "C" {
+#else
+#include <stdbool.h>
 #endif
 
 #define MEMCPY(ENV,D,S,L) do {     \
@@ -108,6 +132,7 @@ extern "C" {
 
 #define MASK_CC          com_sun_jna_Function_MASK_CC
 #define THROW_LAST_ERROR com_sun_jna_Function_THROW_LAST_ERROR
+#define USE_VARARGS      com_sun_jna_Function_USE_VARARGS
 
 /* Cached class, field and method IDs */
 static jclass classObject;
@@ -144,7 +169,9 @@ static jclass classAttachOptions;
 static jclass classNativeMapped;
 static jclass classIntegerType;
 static jclass classPointerType;
+static jclass classJNIEnv;
 static jclass class_ffi_callback;
+static jclass classFromNativeConverter;
 
 static jmethodID MID_Class_getComponentType;
 static jmethodID MID_Object_toString;
@@ -183,6 +210,7 @@ static jmethodID MID_DoubleBuffer_arrayOffset;
 
 static jmethodID MID_Pointer_init;
 static jmethodID MID_Native_dispose;
+static jmethodID MID_Native_fromNativeCallbackParam;
 static jmethodID MID_Native_fromNative;
 static jmethodID MID_Native_nativeType;
 static jmethodID MID_Native_toNativeTypeMapped;
@@ -197,7 +225,7 @@ static jmethodID MID_CallbackReference_getNativeString;
 static jmethodID MID_CallbackReference_initializeThread;
 static jmethodID MID_NativeMapped_toNative;
 static jmethodID MID_WString_init;
-static jmethodID MID_ToNativeConverter_nativeType;
+static jmethodID MID_FromNativeConverter_nativeType;
 static jmethodID MID_ffi_callback_invoke;
 
 static jfieldID FID_Boolean_value;
@@ -268,11 +296,8 @@ w32_short_name(JNIEnv* env, jstring str) {
     size_t size = wcslen(wstr) + 5;
     wchar_t* prefixed = (wchar_t*)alloca(sizeof(wchar_t) * size);
 
-#ifdef _MSC_VER
     swprintf(prefixed, size, L"\\\\?\\%ls", wstr);
-#else
-    swprintf(prefixed, L"\\\\?\\%ls", wstr);
-#endif
+
     if ((required = GetShortPathNameW(prefixed, NULL, 0)) != 0) {
       wchar_t* wshort = (wchar_t*)malloc(sizeof(wchar_t) * required);
       if (GetShortPathNameW(prefixed, wshort, required)) {
@@ -435,6 +460,7 @@ dispatch(JNIEnv *env, void* func, jint flags, jobjectArray args,
   callconv_t callconv = flags & MASK_CC;
   const char* volatile throw_type = NULL;
   const char* volatile throw_msg = NULL;
+  int fixed_args = (flags & USE_VARARGS) >> 7;
 
   nargs = (*env)->GetArrayLength(env, args);
 
@@ -460,7 +486,7 @@ dispatch(JNIEnv *env, void* func, jint flags, jobjectArray args,
     }
     else if ((*env)->IsInstanceOf(env, arg, classBoolean)) {
       c_args[i].i = (*env)->GetBooleanField(env, arg, FID_Boolean_value);
-      arg_types[i] = &ffi_type_sint32;
+      arg_types[i] = &ffi_type_uint32;
       arg_values[i] = &c_args[i].i;
     }
     else if ((*env)->IsInstanceOf(env, arg, classByte)) {
@@ -513,6 +539,11 @@ dispatch(JNIEnv *env, void* func, jint flags, jobjectArray args,
     }
     else if ((*env)->IsInstanceOf(env, arg, classPointer)) {
       c_args[i].l = getNativeAddress(env, arg);
+      arg_types[i] = &ffi_type_pointer;
+      arg_values[i] = &c_args[i].l;
+    }
+    else if ((*env)->IsInstanceOf(env, arg, classJNIEnv)) {
+      c_args[i].l = (void*)env;
       arg_types[i] = &ffi_type_pointer;
       arg_values[i] = &c_args[i].l;
     }
@@ -609,7 +640,9 @@ dispatch(JNIEnv *env, void* func, jint flags, jobjectArray args,
     break;
   }
 
-  status = ffi_prep_cif(&cif, abi, nargs, return_type, arg_types);
+  status = fixed_args
+    ? ffi_prep_cif_var(&cif, abi, fixed_args, nargs, return_type, arg_types)
+    : ffi_prep_cif(&cif, abi, nargs, return_type, arg_types);
   if (!ffi_error(env, "Native call setup", status)) {
     PSTART();
     if ((flags & THROW_LAST_ERROR) != 0) {
@@ -620,7 +653,7 @@ dispatch(JNIEnv *env, void* func, jint flags, jobjectArray args,
       int err = GET_LAST_ERROR();
       JNA_set_last_error(env, err);
       if ((flags & THROW_LAST_ERROR) && err) {
-        char emsg[MSG_SIZE];
+        char emsg[MSG_SIZE - 3 /* literal characters */ - 10 /* max length of %d */];
         snprintf(msg, sizeof(msg), "[%d] %s", err, STR_ERROR(err, emsg, sizeof(emsg)));
         throw_type = ELastError;
         throw_msg = msg;
@@ -1027,7 +1060,11 @@ get_java_type(JNIEnv* env, jclass cls) {
 
 jlong
 getIntegerTypeValue(JNIEnv* env, jobject obj) {
-  return (*env)->GetLongField(env, obj, FID_IntegerType_value);
+  if(obj == NULL) {
+    return 0;
+  } else {
+    return (*env)->GetLongField(env, obj, FID_IntegerType_value);
+  }
 }
 
 void*
@@ -1091,7 +1128,7 @@ initializeThread(callback* cb, AttachOptions* args) {
       if (args->name != NULL) {
         // Make a copy, since the Java Structure which owns this native memory
         // will go out of scope and be available for GC
-        args->name = strdup(args->name);
+        args->name = STRDUP(args->name);
       }
     }
   }
@@ -1111,10 +1148,10 @@ getNativeType(JNIEnv* env, jclass cls) {
                                         MID_Native_nativeType, cls);
 }
 
-void*
-getFFITypeTypeMapped(JNIEnv* env, jobject converter) {
-  return L2A((*env)->CallStaticLongMethod(env, converter,
-                                          MID_ToNativeConverter_nativeType));
+jclass
+getNativeTypeMapped(JNIEnv* env, jobject converter) {
+  return (*env)->CallObjectMethod(env, converter,
+                                          MID_FromNativeConverter_nativeType);
 }
 
 void
@@ -1147,16 +1184,17 @@ static void
 fromNativeTypeMapped(JNIEnv* env, jobject from_native,
                      void* native_return_value,
                      int jtype, size_t size,
-                     jclass java_return_class,
+                     jobject java_method,
                      void* result_storage,
                      const char* encoding) {
   jobject value = new_object(env, (char)jtype, native_return_value, JNI_TRUE, encoding);
   if (!(*env)->ExceptionCheck(env)) {
     jobject obj = (*env)->CallStaticObjectMethod(env, classNative,
                                                  MID_Native_fromNativeTypeMapped,
-                                                 from_native, value, java_return_class);
+                                                 from_native, value, java_method);
     if (!(*env)->ExceptionCheck(env)) {
       // Convert objects into primitive types if the return class demands it
+      jclass java_return_class = (*env)->CallObjectMethod(env, java_method, MID_Method_getReturnType);
       if ((*env)->IsSameObject(env, java_return_class, classPrimitiveBoolean)
           || (*env)->IsSameObject(env, java_return_class, classPrimitiveByte)
           || (*env)->IsSameObject(env, java_return_class, classPrimitiveCharacter)
@@ -1175,13 +1213,25 @@ fromNativeTypeMapped(JNIEnv* env, jobject from_native,
 }
 
 jobject
-fromNative(JNIEnv* env, jclass javaClass, ffi_type* type, void* resp, jboolean promote, const char* encoding) {
+fromNativeCallbackParam(JNIEnv* env, jclass javaClass, ffi_type* type, void* resp, jboolean promote, const char* encoding) {
+  int jtype = get_java_type_from_ffi_type(type);
+  jobject value = new_object(env, (char)jtype, resp, promote, encoding);
+  if (!(*env)->ExceptionCheck(env)) {
+    return (*env)->CallStaticObjectMethod(env, classNative,
+                                          MID_Native_fromNativeCallbackParam,
+                                          javaClass, value);
+  }
+  return NULL;
+}
+
+jobject
+fromNative(JNIEnv* env, jobject javaMethod, ffi_type* type, void* resp, jboolean promote, const char* encoding) {
   int jtype = get_java_type_from_ffi_type(type);
   jobject value = new_object(env, (char)jtype, resp, promote, encoding);
   if (!(*env)->ExceptionCheck(env)) {
     return (*env)->CallStaticObjectMethod(env, classNative,
                                           MID_Native_fromNative,
-                                          javaClass, value);
+                                          javaMethod, value);
   }
   return NULL;
 }
@@ -1670,7 +1720,7 @@ typedef struct _method_data {
   ffi_type** closure_arg_types;
   int*    flags;
   int     rflag;
-  jclass  closure_rclass;
+  jobject closure_method;
   jobject* to_native;
   jobject  from_native;
   jboolean throw_last_error;
@@ -1754,6 +1804,9 @@ dispatch_direct(ffi_cif* cif, void* volatile resp, void** argp, void *cdata) {
       case CVT_POINTER:
         *(void **)args[i] = getNativeAddress(env, *(void **)args[i]);
         break;
+      case CVT_JNIENV:
+        *(void **)args[i] = (void*)env;
+        break;
       case CVT_STRUCTURE:
         objects[i] = *(void **)args[i];
         writeStructure(env, *(void **)args[i]);
@@ -1801,6 +1854,7 @@ dispatch_direct(ffi_cif* cif, void* volatile resp, void** argp, void *cdata) {
    objects[i] = *(void **)args[i];                                      \
    release[i] = (void *)(*env)->Release##Type##ArrayElements;           \
    elems[i] = *(void **)args[i] = (*env)->Get##Type##ArrayElements(env, objects[i], NULL); } while(0)
+      case CVT_ARRAY_BOOLEAN: ARRAY(Boolean); break;
       case CVT_ARRAY_BYTE: ARRAY(Byte); break;
       case CVT_ARRAY_SHORT: ARRAY(Short); break;
       case CVT_ARRAY_CHAR: ARRAY(Char); break;
@@ -1842,7 +1896,7 @@ dispatch_direct(ffi_cif* cif, void* volatile resp, void** argp, void *cdata) {
       int err = GET_LAST_ERROR();
       JNA_set_last_error(env, err);
       if (data->throw_last_error && err) {
-        char emsg[MSG_SIZE];
+        char emsg[MSG_SIZE - 3 /* literal characters */ - 10 /* max length of %d */];
         snprintf(msg, sizeof(msg), "[%d] %s", err, STR_ERROR(err, emsg, sizeof(emsg)));
         throw_type = ELastError;
         throw_msg = msg;
@@ -1856,11 +1910,21 @@ dispatch_direct(ffi_cif* cif, void* volatile resp, void** argp, void *cdata) {
   case CVT_TYPE_MAPPER_STRING:
   case CVT_TYPE_MAPPER_WSTRING:
     {
-      int jtype = (data->rflag == CVT_TYPE_MAPPER_STRING
-                   ? 'c' : (data->rflag == CVT_TYPE_MAPPER_WSTRING
-                            ? 'w' : get_java_type_from_ffi_type(data->cif.rtype)));
-      fromNativeTypeMapped(env, data->from_native, resp, jtype, data->cif.rtype->size,
-                           data->closure_rclass, oldresp, data->encoding);
+       int jtype;
+       if(data->rflag == CVT_TYPE_MAPPER_STRING) {
+           jtype = 'c';
+       } else if (data->rflag == CVT_TYPE_MAPPER_WSTRING) {
+           jtype = 'w';
+       } else {
+           jclass returnClass = getNativeTypeMapped(env, data->from_native);
+           jtype = get_java_type(env, returnClass);
+           if(jtype == -1) {
+               jtype = get_java_type_from_ffi_type(data->cif.rtype);
+           }
+       }
+       
+       fromNativeTypeMapped(env, data->from_native, resp, jtype, data->cif.rtype->size,
+                           data->closure_method, oldresp, data->encoding);
     }
     break;
   case CVT_INTEGER_TYPE:
@@ -1868,7 +1932,7 @@ dispatch_direct(ffi_cif* cif, void* volatile resp, void** argp, void *cdata) {
   case CVT_NATIVE_MAPPED:
   case CVT_NATIVE_MAPPED_STRING:
   case CVT_NATIVE_MAPPED_WSTRING:
-    *(void **)oldresp = fromNative(env, data->closure_rclass, data->cif.rtype, resp, JNI_TRUE, data->encoding);
+    *(void **)oldresp = fromNative(env, data->closure_method, data->cif.rtype, resp, JNI_TRUE, data->encoding);
     break;
   case CVT_POINTER:
     *(void **)resp = newJavaPointer(env, *(void **)resp);
@@ -1880,13 +1944,22 @@ dispatch_direct(ffi_cif* cif, void* volatile resp, void** argp, void *cdata) {
     *(void **)resp = newJavaWString(env, *(void **)resp);
     break;
   case CVT_STRUCTURE:
-    *(void **)resp = newJavaStructure(env, *(void **)resp, data->closure_rclass);
+    {
+      jclass return_class = (*env)->CallObjectMethod(env, data->closure_method, MID_Method_getReturnType);
+      *(void **)resp = newJavaStructure(env, *(void **)resp, return_class);
+    }
     break;
   case CVT_STRUCTURE_BYVAL:
-    *(void **)oldresp = newJavaStructure(env, resp, data->closure_rclass);
+    {
+      jclass return_class = (*env)->CallObjectMethod(env, data->closure_method, MID_Method_getReturnType);
+      *(void **)oldresp = newJavaStructure(env, resp, return_class);
+    }
     break;
   case CVT_CALLBACK:
-    *(void **)resp = newJavaCallback(env, *(void **)resp, data->closure_rclass);
+    {
+      jclass return_class = (*env)->CallObjectMethod(env, data->closure_method, MID_Method_getReturnType);
+      *(void **)resp = newJavaCallback(env, *(void **)resp, return_class);
+    }
     break;
   default:
     break;
@@ -1911,6 +1984,7 @@ dispatch_direct(ffi_cif* cif, void* volatile resp, void** argp, void *cdata) {
         free(*(void **)args[i]);
         break;
       case CVT_BUFFER:
+      case CVT_ARRAY_BOOLEAN:
       case CVT_ARRAY_BYTE:
       case CVT_ARRAY_SHORT:
       case CVT_ARRAY_CHAR:
@@ -1979,13 +2053,14 @@ closure_handler(ffi_cif* cif, void* resp, void** argp, void *cdata)
 ////////////////////
 
 /*
- * Class:     Native
+ * Class:     com_sun_jna_Native
  * Method:    invokePointer
- * Signature: (JI[Ljava/lang/Object;)J;
+ * Signature: (Lcom/sun/jna/Function;JI[Ljava/lang/Object;)J
  */
-JNIEXPORT jlong JNICALL
-Java_com_sun_jna_Native_invokePointer(JNIEnv *env, jclass UNUSED(cls),
-                                      jlong fp, jint callconv, jobjectArray arr)
+JNIEXPORT jlong JNICALL 
+Java_com_sun_jna_Native_invokePointer (JNIEnv *env, jclass UNUSED(cls),
+                                       jobject UNUSED(function), jlong fp,
+                                       jint callconv, jobjectArray arr)
 {
     jvalue result;
     dispatch(env, L2A(fp), callconv, arr, &ffi_type_pointer, &result);
@@ -1994,13 +2069,14 @@ Java_com_sun_jna_Native_invokePointer(JNIEnv *env, jclass UNUSED(cls),
 
 
 /*
- * Class:     Native
+ * Class:     com_sun_jna_Native
  * Method:    invokeObject
- * Signature: (JI[Ljava/lang/Object;)Ljava/lang/Object;
+ * Signature: (Lcom/sun/jna/Function;JI[Ljava/lang/Object;)Ljava/lang/Object;
  */
-JNIEXPORT jobject JNICALL
-Java_com_sun_jna_Native_invokeObject(JNIEnv *env, jclass UNUSED(cls),
-                                     jlong fp, jint callconv, jobjectArray arr)
+JNIEXPORT jobject 
+JNICALL Java_com_sun_jna_Native_invokeObject(JNIEnv *env, jclass UNUSED(cls),
+                                             jobject UNUSED(function), jlong fp,
+                                             jint callconv, jobjectArray arr)
 {
     jvalue result;
     dispatch(env, L2A(fp), callconv, arr, &ffi_type_pointer, &result);
@@ -2009,13 +2085,14 @@ Java_com_sun_jna_Native_invokeObject(JNIEnv *env, jclass UNUSED(cls),
 
 
 /*
- * Class:     Native
+ * Class:     com_sun_jna_Native
  * Method:    invokeStructure
- * Signature: (JI[Ljava/lang/Object;Lcom/sun/jna/Structure)LStructure;
+ * Signature: (Lcom/sun/jna/Function;JI[Ljava/lang/Object;JJ)V
  */
-JNIEXPORT void JNICALL
-Java_com_sun_jna_Native_invokeStructure(JNIEnv *env, jclass UNUSED(cls),
-                                        jlong fp, jint callconv, jobjectArray arr,
+JNIEXPORT void JNICALL 
+Java_com_sun_jna_Native_invokeStructure(JNIEnv *env, jclass UNUSED(cls), 
+                                        jobject UNUSED(function), jlong fp,
+                                        jint callconv, jobjectArray arr,
                                         jlong memory, jlong type_info)
 {
   ffi_type* rtype = (ffi_type*)L2A(type_info);
@@ -2028,13 +2105,14 @@ Java_com_sun_jna_Native_invokeStructure(JNIEnv *env, jclass UNUSED(cls),
 }
 
 /*
- * Class:     Native
+ * Class:     com_sun_jna_Native
  * Method:    invokeDouble
- * Signature: (JI[Ljava/lang/Object;)D
+ * Signature: (Lcom/sun/jna/Function;JI[Ljava/lang/Object;)D
  */
 JNIEXPORT jdouble JNICALL
-Java_com_sun_jna_Native_invokeDouble(JNIEnv *env, jclass UNUSED(cls),
-                                     jlong fp, jint callconv, jobjectArray arr)
+Java_com_sun_jna_Native_invokeDouble(JNIEnv *env, jclass UNUSED(cls), 
+                                     jobject UNUSED(function), jlong fp, 
+                                     jint callconv, jobjectArray arr)
 {
     jvalue result;
     dispatch(env, L2A(fp), callconv, arr, &ffi_type_double, &result);
@@ -2042,13 +2120,14 @@ Java_com_sun_jna_Native_invokeDouble(JNIEnv *env, jclass UNUSED(cls),
 }
 
 /*
- * Class:     Native
+ * Class:     com_sun_jna_Native
  * Method:    invokeFloat
- * Signature: (JI[Ljava/lang/Object;)F
+ * Signature: (Lcom/sun/jna/Function;JI[Ljava/lang/Object;)F
  */
 JNIEXPORT jfloat JNICALL
-Java_com_sun_jna_Native_invokeFloat(JNIEnv *env, jclass UNUSED(cls),
-                                    jlong fp, jint callconv, jobjectArray arr)
+Java_com_sun_jna_Native_invokeFloat(JNIEnv *env, jclass UNUSED(cls), 
+                                    jobject UNUSED(function), jlong fp,
+                                    jint callconv, jobjectArray arr)
 {
     jvalue result;
     dispatch(env, L2A(fp), callconv, arr, &ffi_type_float, &result);
@@ -2056,13 +2135,14 @@ Java_com_sun_jna_Native_invokeFloat(JNIEnv *env, jclass UNUSED(cls),
 }
 
 /*
- * Class:     Native
+ * Class:     com_sun_jna_Native
  * Method:    invokeInt
- * Signature: (JI[Ljava/lang/Object;)I
+ * Signature: (Lcom/sun/jna/Function;JI[Ljava/lang/Object;)I
  */
 JNIEXPORT jint JNICALL
-Java_com_sun_jna_Native_invokeInt(JNIEnv *env, jclass UNUSED(cls),
-                                  jlong fp, jint callconv, jobjectArray arr)
+Java_com_sun_jna_Native_invokeInt(JNIEnv *env, jclass UNUSED(cls), 
+                                  jobject UNUSED(function), jlong fp, jint callconv,
+                                  jobjectArray arr)
 {
     ffi_arg result;
     dispatch(env, L2A(fp), callconv, arr, &ffi_type_sint32, &result);
@@ -2070,13 +2150,14 @@ Java_com_sun_jna_Native_invokeInt(JNIEnv *env, jclass UNUSED(cls),
 }
 
 /*
- * Class:     Native
+ * Class:     com_sun_jna_Native
  * Method:    invokeLong
- * Signature: (JI[Ljava/lang/Object;)J
+ * Signature: (Lcom/sun/jna/Function;JI[Ljava/lang/Object;)J
  */
 JNIEXPORT jlong JNICALL
 Java_com_sun_jna_Native_invokeLong(JNIEnv *env, jclass UNUSED(cls),
-                                   jlong fp, jint callconv, jobjectArray arr)
+                                   jobject UNUSED(function), jlong fp, jint callconv,
+                                   jobjectArray arr)
 {
     jvalue result;
     dispatch(env, L2A(fp), callconv, arr, &ffi_type_sint64, &result);
@@ -2084,13 +2165,14 @@ Java_com_sun_jna_Native_invokeLong(JNIEnv *env, jclass UNUSED(cls),
 }
 
 /*
- * Class:     Native
+ * Class:     com_sun_jna_Native
  * Method:    invokeVoid
- * Signature: (JI[Ljava/lang/Object;)V
+ * Signature: (Lcom/sun/jna/Function;JI[Ljava/lang/Object;)V
  */
 JNIEXPORT void JNICALL
 Java_com_sun_jna_Native_invokeVoid(JNIEnv *env, jclass UNUSED(cls),
-                                   jlong fp, jint callconv, jobjectArray arr)
+                                   jobject UNUSED(function), jlong fp, jint callconv,
+                                   jobjectArray arr)
 {
     jvalue result;
     dispatch(env, L2A(fp), callconv, arr, &ffi_type_void, &result);
@@ -2202,103 +2284,103 @@ Java_com_sun_jna_Native_findSymbol(JNIEnv *env, jclass UNUSED(cls),
 }
 
 /*
- * Class:     Native
- * Method:    _write
- * Signature: (J[BII)V
+ * Class:     com_sun_jna_Native
+ * Method:    write
+ * Signature: (Lcom/sun/jna/Pointer;JJ[BII)V
  */
-JNIEXPORT void JNICALL Java_com_sun_jna_Native_write__J_3BII
-(JNIEnv *env, jclass UNUSED(cls), jlong addr, jbyteArray arr, jint off, jint n)
+JNIEXPORT void JNICALL Java_com_sun_jna_Native_write__Lcom_sun_jna_Pointer_2JJ_3BII
+(JNIEnv *env, jclass UNUSED(cls), jobject UNUSED(pointer), jlong addr, jlong offset, jbyteArray arr, jint off, jint n)
 {
   PSTART();
-  (*env)->GetByteArrayRegion(env, arr, off, n, L2A(addr));
+  (*env)->GetByteArrayRegion(env, arr, off, n, L2A(addr + offset));
   PEND(env);
 }
 
 /*
- * Class:     Native
- * Method:    _write
- * Signature: (J[CII)V
+ * Class:     com_sun_jna_Native
+ * Method:    write
+ * Signature: (Lcom/sun/jna/Pointer;JJ[CII)V
  */
-JNIEXPORT void JNICALL Java_com_sun_jna_Native_write__J_3CII
-(JNIEnv *env, jclass UNUSED(cls), jlong addr, jcharArray arr, jint off, jint n)
+JNIEXPORT void JNICALL Java_com_sun_jna_Native_write__Lcom_sun_jna_Pointer_2JJ_3CII
+(JNIEnv *env, jclass UNUSED(cls), jobject UNUSED(pointer), jlong addr, jlong offset, jcharArray arr, jint off, jint n)
 {
-  getChars(env, (wchar_t*)L2A(addr), arr, off, n);
+  getChars(env, (wchar_t*)L2A(addr + offset), arr, off, n);
 }
 
 /*
- * Class:     Native
- * Method:    _write
- * Signature: (J[DII)V
+ * Class:     com_sun_jna_Native
+ * Method:    write
+ * Signature: (Lcom/sun/jna/Pointer;JJ[DII)V
  */
-JNIEXPORT void JNICALL Java_com_sun_jna_Native_write__J_3DII
-(JNIEnv *env, jclass UNUSED(cls), jlong addr, jdoubleArray arr, jint off, jint n)
+JNIEXPORT void JNICALL Java_com_sun_jna_Native_write__Lcom_sun_jna_Pointer_2JJ_3DII
+(JNIEnv *env, jclass UNUSED(cls), jobject UNUSED(pointer), jlong addr, jlong offset, jdoubleArray arr, jint off, jint n)
 {
   PSTART();
-  (*env)->GetDoubleArrayRegion(env, arr, off, n, (jdouble*)L2A(addr));
+  (*env)->GetDoubleArrayRegion(env, arr, off, n, (jdouble*)L2A(addr + offset));
   PEND(env);
 }
 
 /*
- * Class:     Native
- * Method:    _write
- * Signature: (J[FII)V
+ * Class:     com_sun_jna_Native
+ * Method:    write
+ * Signature: (Lcom/sun/jna/Pointer;JJ[FII)V
  */
-JNIEXPORT void JNICALL Java_com_sun_jna_Native_write__J_3FII
-(JNIEnv *env, jclass UNUSED(cls), jlong addr, jfloatArray arr, jint off, jint n)
+JNIEXPORT void JNICALL Java_com_sun_jna_Native_write__Lcom_sun_jna_Pointer_2JJ_3FII
+(JNIEnv *env, jclass UNUSED(cls), jobject UNUSED(pointer), jlong addr, jlong offset, jfloatArray arr, jint off, jint n)
 {
   PSTART();
-  (*env)->GetFloatArrayRegion(env, arr, off, n, (jfloat*)L2A(addr));
+  (*env)->GetFloatArrayRegion(env, arr, off, n, (jfloat*)L2A(addr + offset));
   PEND(env);
 }
 
 /*
- * Class:     Native
- * Method:    _write
- * Signature: (J[III)V
+ * Class:     com_sun_jna_Native
+ * Method:    write
+ * Signature: (Lcom/sun/jna/Pointer;JJ[III)V
  */
-JNIEXPORT void JNICALL Java_com_sun_jna_Native_write__J_3III
-(JNIEnv *env, jclass UNUSED(cls), jlong addr, jintArray arr, jint off, jint n)
+JNIEXPORT void JNICALL Java_com_sun_jna_Native_write__Lcom_sun_jna_Pointer_2JJ_3III
+(JNIEnv *env, jclass UNUSED(cls), jobject UNUSED(pointer), jlong addr, jlong offset, jintArray arr, jint off, jint n)
 {
   PSTART();
-  (*env)->GetIntArrayRegion(env, arr, off, n, (jint*)L2A(addr));
+  (*env)->GetIntArrayRegion(env, arr, off, n, (jint*)L2A(addr + offset));
   PEND(env);
 }
 
 /*
- * Class:     Native
- * Method:    _write
- * Signature: (J[JII)V
+ * Class:     com_sun_jna_Native
+ * Method:    write
+ * Signature: (Lcom/sun/jna/Pointer;JJ[JII)V
  */
-JNIEXPORT void JNICALL Java_com_sun_jna_Native_write__J_3JII
-(JNIEnv *env, jclass UNUSED(cls), jlong addr, jlongArray arr, jint off, jint n)
+JNIEXPORT void JNICALL Java_com_sun_jna_Native_write__Lcom_sun_jna_Pointer_2JJ_3JII
+(JNIEnv *env, jclass UNUSED(cls), jobject UNUSED(pointer), jlong addr, jlong offset, jlongArray arr, jint off, jint n)
 {
   PSTART();
-  (*env)->GetLongArrayRegion(env, arr, off, n, (jlong*)L2A(addr));
+  (*env)->GetLongArrayRegion(env, arr, off, n, (jlong*)L2A(addr + offset));
   PEND(env);
 }
 
 /*
- * Class:     Native
- * Method:    _write
- * Signature: (J[SII)V
+ * Class:     com_sun_jna_Native
+ * Method:    write
+ * Signature: (Lcom/sun/jna/Pointer;JJ[SII)V
  */
-JNIEXPORT void JNICALL Java_com_sun_jna_Native_write__J_3SII
-(JNIEnv *env, jclass UNUSED(cls), jlong addr, jshortArray arr, jint off, jint n)
+JNIEXPORT void JNICALL Java_com_sun_jna_Native_write__Lcom_sun_jna_Pointer_2JJ_3SII
+(JNIEnv *env, jclass UNUSED(cls), jobject UNUSED(pointer), jlong addr, jlong offset, jshortArray arr, jint off, jint n)
 {
   PSTART();
-  (*env)->GetShortArrayRegion(env, arr, off, n, (jshort*)L2A(addr));
+  (*env)->GetShortArrayRegion(env, arr, off, n, (jshort*)L2A(addr + offset));
   PEND(env);
 }
 
 /*
- * Class:     Native
- * Method:    _indexOf
- * Signature: (JB)J
+ * Class:     com_sun_jna_Native
+ * Method:    indexOf
+ * Signature: (Lcom/sun/jna/Pointer;JJB)J
  */
-JNIEXPORT jlong JNICALL Java_com_sun_jna_Native_indexOf__JB
-(JNIEnv * UNUSED_ENV(env), jclass UNUSED(cls), jlong addr, jbyte value)
+JNIEXPORT jlong JNICALL Java_com_sun_jna_Native_indexOf
+(JNIEnv * UNUSED_ENV(env), jclass UNUSED(cls), jobject UNUSED(pointer), jlong addr, jlong offset, jbyte value)
 {
-  jbyte *peer = (jbyte *)L2A(addr);
+  jbyte *peer = (jbyte *)L2A(addr + offset);
   volatile jlong i = 0;
   volatile jlong result = -1L;
   PSTART();
@@ -2313,124 +2395,124 @@ JNIEXPORT jlong JNICALL Java_com_sun_jna_Native_indexOf__JB
 }
 
 /*
- * Class:     Native
- * Method:    _read
- * Signature: (J[BII)V
+ * Class:     com_sun_jna_Native
+ * Method:    read
+ * Signature: (Lcom/sun/jna/Pointer;JJ[BII)V
  */
-JNIEXPORT void JNICALL Java_com_sun_jna_Native_read__J_3BII
-(JNIEnv *env, jclass UNUSED(cls), jlong addr, jbyteArray arr, jint off, jint n)
+JNIEXPORT void JNICALL Java_com_sun_jna_Native_read__Lcom_sun_jna_Pointer_2JJ_3BII
+(JNIEnv *env, jclass UNUSED(cls), jobject UNUSED(pointer), jlong addr, jlong offset, jbyteArray arr, jint off, jint n)
 {
   PSTART();
-  (*env)->SetByteArrayRegion(env, arr, off, n, L2A(addr));
+  (*env)->SetByteArrayRegion(env, arr, off, n, L2A(addr + offset));
   PEND(env);
 }
 
 /*
- * Class:     Native
- * Method:    _read
- * Signature: (J[CII)V
+ * Class:     com_sun_jna_Native
+ * Method:    read
+ * Signature: (Lcom/sun/jna/Pointer;JJ[CII)V
  */
-JNIEXPORT void JNICALL Java_com_sun_jna_Native_read__J_3CII
-    (JNIEnv *env, jclass UNUSED(cls), jlong addr, jcharArray arr, jint off, jint n)
+JNIEXPORT void JNICALL Java_com_sun_jna_Native_read__Lcom_sun_jna_Pointer_2JJ_3CII
+    (JNIEnv *env, jclass UNUSED(cls), jobject UNUSED(pointer), jlong addr, jlong offset, jcharArray arr, jint off, jint n)
 {
-  setChars(env, (wchar_t*)L2A(addr), arr, off, n);
+  setChars(env, (wchar_t*)L2A(addr + offset), arr, off, n);
 }
 
 /*
- * Class:     Native
- * Method:    _read
- * Signature: (J[DII)V
+ * Class:     com_sun_jna_Native
+ * Method:    read
+ * Signature: (Lcom/sun/jna/Pointer;JJ[DII)V
  */
-JNIEXPORT void JNICALL Java_com_sun_jna_Native_read__J_3DII
-    (JNIEnv *env, jclass UNUSED(cls), jlong addr, jdoubleArray arr, jint off, jint n)
+JNIEXPORT void JNICALL Java_com_sun_jna_Native_read__Lcom_sun_jna_Pointer_2JJ_3DII
+    (JNIEnv *env, jclass UNUSED(cls), jobject UNUSED(pointer), jlong addr, jlong offset, jdoubleArray arr, jint off, jint n)
 {
   PSTART();
-  (*env)->SetDoubleArrayRegion(env, arr, off, n, (jdouble*)L2A(addr));
+  (*env)->SetDoubleArrayRegion(env, arr, off, n, (jdouble*)L2A(addr + offset));
   PEND(env);
 }
 
 /*
- * Class:     Native
- * Method:    _read
- * Signature: (J[FII)V
+ * Class:     com_sun_jna_Native
+ * Method:    read
+ * Signature: (Lcom/sun/jna/Pointer;JJ[FII)V
  */
-JNIEXPORT void JNICALL Java_com_sun_jna_Native_read__J_3FII
-    (JNIEnv *env, jclass UNUSED(cls), jlong addr, jfloatArray arr, jint off, jint n)
+JNIEXPORT void JNICALL Java_com_sun_jna_Native_read__Lcom_sun_jna_Pointer_2JJ_3FII
+    (JNIEnv *env, jclass UNUSED(cls), jobject UNUSED(pointer), jlong addr, jlong offset, jfloatArray arr, jint off, jint n)
 {
   PSTART();
-  (*env)->SetFloatArrayRegion(env, arr, off, n, (jfloat*)L2A(addr));
+  (*env)->SetFloatArrayRegion(env, arr, off, n, (jfloat*)L2A(addr + offset));
   PEND(env);
 }
 
 /*
- * Class:     Native
- * Method:    _read
- * Signature: (J[III)V
+ * Class:     com_sun_jna_Native
+ * Method:    read
+ * Signature: (Lcom/sun/jna/Pointer;JJ[III)V
  */
-JNIEXPORT void JNICALL Java_com_sun_jna_Native_read__J_3III
-    (JNIEnv *env, jclass UNUSED(cls), jlong addr, jintArray arr, jint off, jint n)
+JNIEXPORT void JNICALL Java_com_sun_jna_Native_read__Lcom_sun_jna_Pointer_2JJ_3III
+    (JNIEnv *env, jclass UNUSED(cls), jobject UNUSED(pointer), jlong addr, jlong offset, jintArray arr, jint off, jint n)
 {
   PSTART();
-  (*env)->SetIntArrayRegion(env, arr, off, n, (jint*)L2A(addr));
+  (*env)->SetIntArrayRegion(env, arr, off, n, (jint*)L2A(addr + offset));
   PEND(env);
 }
 
 /*
- * Class:     Native
- * Method:    _read
- * Signature: (J[JII)V
+ * Class:     com_sun_jna_Native
+ * Method:    read
+ * Signature: (Lcom/sun/jna/Pointer;JJ[JII)V
  */
-JNIEXPORT void JNICALL Java_com_sun_jna_Native_read__J_3JII
-    (JNIEnv *env, jclass UNUSED(cls), jlong addr, jlongArray arr, jint off, jint n)
+JNIEXPORT void JNICALL Java_com_sun_jna_Native_read__Lcom_sun_jna_Pointer_2JJ_3JII
+    (JNIEnv *env, jclass UNUSED(cls), jobject UNUSED(pointer), jlong addr, jlong offset, jlongArray arr, jint off, jint n)
 {
   PSTART();
-  (*env)->SetLongArrayRegion(env, arr, off, n, (jlong*)L2A(addr));
+  (*env)->SetLongArrayRegion(env, arr, off, n, (jlong*)L2A(addr + offset));
   PEND(env);
 }
 
 /*
- * Class:     Native
- * Method:    _read
- * Signature: (J[SII)V
+ * Class:     com_sun_jna_Native
+ * Method:    read
+ * Signature: (Lcom/sun/jna/Pointer;JJ[SII)V
  */
-JNIEXPORT void JNICALL Java_com_sun_jna_Native_read__J_3SII
-    (JNIEnv *env, jclass UNUSED(cls), jlong addr, jshortArray arr, jint off, jint n)
+JNIEXPORT void JNICALL Java_com_sun_jna_Native_read__Lcom_sun_jna_Pointer_2JJ_3SII
+    (JNIEnv *env, jclass UNUSED(cls), jobject UNUSED(pointer), jlong addr, jlong offset, jshortArray arr, jint off, jint n)
 {
   PSTART();
-  (*env)->SetShortArrayRegion(env, arr, off, n, (jshort*)L2A(addr));
+  (*env)->SetShortArrayRegion(env, arr, off, n, (jshort*)L2A(addr + offset));
   PEND(env);
 }
 
 /*
- * Class:     Native
- * Method:    _getByte
- * Signature: (J)B
+ * Class:     com_sun_jna_Native
+ * Method:    getByte
+ * Signature: (Lcom/sun/jna/Pointer;JJ)B
  */
 JNIEXPORT jbyte JNICALL Java_com_sun_jna_Native_getByte
-(JNIEnv * UNUSED_ENV(env), jclass UNUSED(cls), jlong addr)
+(JNIEnv * UNUSED_ENV(env), jclass UNUSED(cls), jobject UNUSED(pointer), jlong addr, jlong offset)
 {
     jbyte res = 0;
-    MEMCPY(env, &res, L2A(addr), sizeof(res));
+    MEMCPY(env, &res, L2A(addr + offset), sizeof(res));
     return res;
 }
 
 /*
- * Class:     Native
- * Method:    _getChar
- * Signature: (J)C
+ * Class:     com_sun_jna_Native
+ * Method:    getChar
+ * Signature: (Lcom/sun/jna/Pointer;JJ)C
  */
 JNIEXPORT jchar JNICALL Java_com_sun_jna_Native_getChar
-(JNIEnv * UNUSED_ENV(env), jclass UNUSED(cls), jlong addr)
+(JNIEnv * UNUSED_ENV(env), jclass UNUSED(cls), jobject UNUSED(pointer), jlong addr, jlong offset)
 {
     wchar_t res = 0;
-    MEMCPY(env, &res, L2A(addr), sizeof(res));
+    MEMCPY(env, &res, L2A(addr + offset), sizeof(res));
     return (jchar)res;
 }
 
 /*
- * Class:     Native
+ * Class:     com_sun_jna_Native
  * Method:    _getPointer
- * Signature: (J)Lcom/sun/jna/Pointer;
+ * Signature: (J)J
  */
 JNIEXPORT jlong JNICALL Java_com_sun_jna_Native__1getPointer
 (JNIEnv *UNUSED_ENV(env), jclass UNUSED(cls), jlong addr)
@@ -2442,110 +2524,111 @@ JNIEXPORT jlong JNICALL Java_com_sun_jna_Native__1getPointer
 
 /*
  * Class:     com_sun_jna_Native
- * Method:    _getDirectByteBuffer
- * Signature: (JJ)Ljava/nio/ByteBuffer;
+ * Method:    getDirectByteBuffer
+ * Signature: (Lcom/sun/jna/Pointer;JJJ)Ljava/nio/ByteBuffer;
  */
-JNIEXPORT jobject JNICALL Java_com_sun_jna_Native_getDirectByteBuffer
-    (JNIEnv *env, jclass UNUSED(cls), jlong addr, jlong length)
+JNIEXPORT jobject JNICALL Java_com_sun_jna_Native_getDirectByteBuffer__Lcom_sun_jna_Pointer_2JJJ
+    (JNIEnv *env, jclass UNUSED(cls), jobject UNUSED(pointer), jlong addr, jlong offset, jlong length)
 {
 #ifdef NO_NIO_BUFFERS
     return NULL;
 #else
-    return (*env)->NewDirectByteBuffer(env, L2A(addr), length);
+    return (*env)->NewDirectByteBuffer(env, L2A(addr + offset), length);
 #endif
 }
 
 /*
- * Class:     Native
- * Method:    _getDouble
- * Signature: (J)D
+ * Class:     com_sun_jna_Native
+ * Method:    getDouble
+ * Signature: (Lcom/sun/jna/Pointer;JJ)D
  */
 JNIEXPORT jdouble JNICALL Java_com_sun_jna_Native_getDouble
-(JNIEnv * UNUSED_ENV(env), jclass UNUSED(cls), jlong addr)
+(JNIEnv * UNUSED_ENV(env), jclass UNUSED(cls), jobject UNUSED(pointer), jlong addr, jlong offset)
 {
     jdouble res = 0;
-    MEMCPY(env, &res, L2A(addr), sizeof(res));
+    MEMCPY(env, &res, L2A(addr + offset), sizeof(res));
     return res;
 }
 
 /*
- * Class:     Native
- * Method:    _getFloat
- * Signature: (J)F
+ * Class:     com_sun_jna_Native
+ * Method:    getFloat
+ * Signature: (Lcom/sun/jna/Pointer;JJ)F
  */
 JNIEXPORT jfloat JNICALL Java_com_sun_jna_Native_getFloat
-(JNIEnv * UNUSED_ENV(env), jclass UNUSED(cls), jlong addr)
+(JNIEnv * UNUSED_ENV(env), jclass UNUSED(cls), jobject UNUSED(pointer), jlong addr, jlong offset)
 {
     jfloat res = 0;
-    MEMCPY(env, &res, L2A(addr), sizeof(res));
+    MEMCPY(env, &res, L2A(addr + offset), sizeof(res));
     return res;
 }
 
 /*
- * Class:     Native
- * Method:    _getInt
- * Signature: (J)I
+ * Class:     com_sun_jna_Native
+ * Method:    getInt
+ * Signature: (Lcom/sun/jna/Pointer;JJ)I
  */
 JNIEXPORT jint JNICALL Java_com_sun_jna_Native_getInt
-(JNIEnv * UNUSED_ENV(env), jclass UNUSED(cls), jlong addr)
+(JNIEnv * UNUSED_ENV(env), jclass UNUSED(cls), jobject UNUSED(pointer), jlong addr, jlong offset)
 {
     jint res = 0;
-    MEMCPY(env, &res, L2A(addr), sizeof(res));
+    MEMCPY(env, &res, L2A(addr + offset), sizeof(res));
     return res;
 }
 
 /*
- * Class:     Native
- * Method:    _getLong
- * Signature: (J)J
+ * Class:     com_sun_jna_Native
+ * Method:    getLong
+ * Signature: (Lcom/sun/jna/Pointer;JJ)J
  */
 JNIEXPORT jlong JNICALL Java_com_sun_jna_Native_getLong
-(JNIEnv * UNUSED_ENV(env), jclass UNUSED(cls), jlong addr)
+(JNIEnv * UNUSED_ENV(env), jclass UNUSED(cls), jobject UNUSED(pointer), jlong addr, jlong offset)
 {
     jlong res = 0;
-    MEMCPY(env, &res, L2A(addr), sizeof(res));
+    MEMCPY(env, &res, L2A(addr + offset), sizeof(res));
     return res;
 }
 
 /*
- * Class:     Native
- * Method:    _getShort
- * Signature: (J)S
+ * Class:     com_sun_jna_Native
+ * Method:    getShort
+ * Signature: (Lcom/sun/jna/Pointer;JJ)S
  */
 JNIEXPORT jshort JNICALL Java_com_sun_jna_Native_getShort
-(JNIEnv * UNUSED_ENV(env), jclass UNUSED(cls), jlong addr)
+(JNIEnv * UNUSED_ENV(env), jclass UNUSED(cls), jobject UNUSED(pointer), jlong addr, jlong offset)
 {
     jshort res = 0;
-    MEMCPY(env, &res, L2A(addr), sizeof(res));
+    MEMCPY(env, &res, L2A(addr + offset), sizeof(res));
     return res;
 }
 
 /*
- * Class:     Native
+ * Class:     com_sun_jna_Native
  * Method:    getWideString
- * Signature: (JB)Ljava/lang/String;
+ * Signature: (Lcom/sun/jna/Pointer;JJ)Ljava/lang/String;
  */
 JNIEXPORT jstring JNICALL Java_com_sun_jna_Native_getWideString
-(JNIEnv *env, jclass UNUSED(cls), jlong addr)
+(JNIEnv *env, jclass UNUSED(cls), jobject UNUSED(pointer), jlong addr, jlong offset)
 {
-  return newJavaString(env, L2A(addr), NULL);
+  return newJavaString(env, L2A(addr + offset), NULL);
 }
 
 /*
- * Class:     Native
+ * Class:     com_sun_jna_Native
  * Method:    getStringBytes
- * Signature: (JB)LB;
+ * Signature: (Lcom/sun/jna/Pointer;JJ)[B
  */
 JNIEXPORT jbyteArray JNICALL Java_com_sun_jna_Native_getStringBytes
-(JNIEnv *env, jclass UNUSED(cls), jlong addr)
+(JNIEnv *env, jclass UNUSED(cls), jobject UNUSED(pointer), jlong baseaddr, jlong offset)
 {
   volatile jbyteArray bytes = 0;
   PSTART();
   {
-    int len = (int)strlen(L2A(addr));
+    void* addr = L2A(baseaddr + offset);
+    int len = (int)strlen(addr);
     bytes = (*env)->NewByteArray(env, len);
     if (bytes != 0) {
-      (*env)->SetByteArrayRegion(env, bytes, 0, len, (jbyte *)L2A(addr));
+      (*env)->SetByteArrayRegion(env, bytes, 0, len, (jbyte *)addr);
     }
     else {
       throwByName(env, EOutOfMemory, "Can't allocate byte array");
@@ -2556,113 +2639,113 @@ JNIEXPORT jbyteArray JNICALL Java_com_sun_jna_Native_getStringBytes
 }
 
 /*
- * Class:     Native
+ * Class:     com_sun_jna_Native
  * Method:    setMemory
- * Signature: (JJB)V
+ * Signature: (Lcom/sun/jna/Pointer;JJJB)V
  */
 JNIEXPORT void JNICALL Java_com_sun_jna_Native_setMemory
-(JNIEnv *UNUSED_ENV(env), jclass UNUSED(cls), jlong addr, jlong count, jbyte value)
+(JNIEnv *UNUSED_ENV(env), jclass UNUSED(cls), jobject UNUSED(pointer), jlong addr, jlong offset, jlong count, jbyte value)
 {
-  MEMSET(env, L2A(addr), (int)value, (size_t)count);
+  MEMSET(env, L2A(addr + offset), (int)value, (size_t)count);
 }
 
 /*
- * Class:     Native
- * Method:    _setByte
- * Signature: (JB)V
+ * Class:     com_sun_jna_Native
+ * Method:    setByte
+ * Signature: (Lcom/sun/jna/Pointer;JJB)V
  */
 JNIEXPORT void JNICALL Java_com_sun_jna_Native_setByte
-(JNIEnv * UNUSED_ENV(env), jclass UNUSED(cls), jlong addr, jbyte value)
+(JNIEnv * UNUSED_ENV(env), jclass UNUSED(cls), jobject UNUSED(pointer), jlong addr, jlong offset, jbyte value)
 {
-  MEMCPY(env, L2A(addr), &value, sizeof(value));
+  MEMCPY(env, L2A(addr  + offset), &value, sizeof(value));
 }
 
 /*
- * Class:     Native
- * Method:    _setChar
- * Signature: (JC)V
+ * Class:     com_sun_jna_Native
+ * Method:    setChar
+ * Signature: (Lcom/sun/jna/Pointer;JJC)V
  */
 JNIEXPORT void JNICALL Java_com_sun_jna_Native_setChar
-(JNIEnv * UNUSED_ENV(env), jclass UNUSED(cls), jlong addr, jchar value)
+(JNIEnv * UNUSED_ENV(env), jclass UNUSED(cls), jobject UNUSED(pointer), jlong addr, jlong offset, jchar value)
 {
   wchar_t ch = value;
-  MEMCPY(env, L2A(addr), &ch, sizeof(ch));
+  MEMCPY(env, L2A(addr + offset), &ch, sizeof(ch));
 }
 
 /*
- * Class:     Native
- * Method:    _setNative
- * Signature: (JJ)V
+ * Class:     com_sun_jna_Native
+ * Method:    setPointer
+ * Signature: (Lcom/sun/jna/Pointer;JJJ)V
  */
 JNIEXPORT void JNICALL Java_com_sun_jna_Native_setPointer
-(JNIEnv * UNUSED_ENV(env), jclass UNUSED(cls), jlong addr, jlong value)
+(JNIEnv * UNUSED_ENV(env), jclass UNUSED(cls), jobject UNUSED(pointer), jlong addr, jlong offset, jlong value)
 {
   void *ptr = L2A(value);
-  MEMCPY(env, L2A(addr), &ptr, sizeof(void *));
+  MEMCPY(env, L2A(addr + offset), &ptr, sizeof(void *));
 }
 
 /*
- * Class:     Native
- * Method:    _setDouble
- * Signature: (JD)V
+ * Class:     com_sun_jna_Native
+ * Method:    setDouble
+ * Signature: (Lcom/sun/jna/Pointer;JJD)V
  */
 JNIEXPORT void JNICALL Java_com_sun_jna_Native_setDouble
-(JNIEnv * UNUSED_ENV(env), jclass UNUSED(cls), jlong addr, jdouble value)
+(JNIEnv * UNUSED_ENV(env), jclass UNUSED(cls), jobject UNUSED(pointer), jlong addr, jlong offset, jdouble value)
 {
-  MEMCPY(env, L2A(addr), &value, sizeof(value));
+  MEMCPY(env, L2A(addr + offset), &value, sizeof(value));
 }
 
 /*
- * Class:     Native
- * Method:    _setFloat
- * Signature: (JF)V
+ * Class:     com_sun_jna_Native
+ * Method:    setFloat
+ * Signature: (Lcom/sun/jna/Pointer;JJF)V
  */
 JNIEXPORT void JNICALL Java_com_sun_jna_Native_setFloat
-(JNIEnv * UNUSED_ENV(env), jclass UNUSED(cls), jlong addr, jfloat value)
+(JNIEnv * UNUSED_ENV(env), jclass UNUSED(cls), jobject UNUSED(pointer), jlong addr, jlong offset, jfloat value)
 {
-  MEMCPY(env, L2A(addr), &value, sizeof(value));
+  MEMCPY(env, L2A(addr + offset), &value, sizeof(value));
 }
 
 /*
- * Class:     Native
- * Method:    _setInt
- * Signature: (JI)V
+ * Class:     com_sun_jna_Native
+ * Method:    setInt
+ * Signature: (Lcom/sun/jna/Pointer;JJI)V
  */
 JNIEXPORT void JNICALL Java_com_sun_jna_Native_setInt
-(JNIEnv * UNUSED_ENV(env), jclass UNUSED(cls), jlong addr, jint value)
+(JNIEnv * UNUSED_ENV(env), jclass UNUSED(cls), jobject UNUSED(pointer), jlong addr, jlong offset, jint value)
 {
-  MEMCPY(env, L2A(addr), &value, sizeof(value));
+  MEMCPY(env, L2A(addr + offset), &value, sizeof(value));
 }
 
 /*
- * Class:     Native
- * Method:    _setLong
- * Signature: (JJ)V
+ * Class:     com_sun_jna_Native
+ * Method:    setLong
+ * Signature: (Lcom/sun/jna/Pointer;JJJ)V
  */
 JNIEXPORT void JNICALL Java_com_sun_jna_Native_setLong
-(JNIEnv * UNUSED_ENV(env), jclass UNUSED(cls), jlong addr, jlong value)
+(JNIEnv * UNUSED_ENV(env), jclass UNUSED(cls), jobject UNUSED(pointer), jlong addr, jlong offset, jlong value)
 {
-  MEMCPY(env, L2A(addr), &value, sizeof(value));
+  MEMCPY(env, L2A(addr + offset), &value, sizeof(value));
 }
 
 /*
- * Class:     Native
- * Method:    _setShort
- * Signature: (JS)V
+ * Class:     com_sun_jna_Native
+ * Method:    setShort
+ * Signature: (Lcom/sun/jna/Pointer;JJS)V
  */
 JNIEXPORT void JNICALL Java_com_sun_jna_Native_setShort
-(JNIEnv * UNUSED_ENV(env), jclass UNUSED(cls), jlong addr, jshort value)
+(JNIEnv * UNUSED_ENV(env), jclass UNUSED(cls), jobject UNUSED(pointer), jlong addr, jlong offset, jshort value)
 {
-  MEMCPY(env, L2A(addr), &value, sizeof(value));
+  MEMCPY(env, L2A(addr + offset), &value, sizeof(value));
 }
 
 /*
- * Class:     Native
+ * Class:     com_sun_jna_Native
  * Method:    setWideString
- * Signature: (JLjava/lang/String;)V
+ * Signature: (Lcom/sun/jna/Pointer;JJLjava/lang/String;)V
  */
 JNIEXPORT void JNICALL Java_com_sun_jna_Native_setWideString
-(JNIEnv *env, jclass UNUSED(cls), jlong addr, jstring value)
+(JNIEnv *env, jclass UNUSED(cls), jobject UNUSED(pointer), jlong addr, jlong offset, jstring value)
 {
     int len = (*env)->GetStringLength(env, value);
     const void* volatile str;
@@ -2670,7 +2753,7 @@ JNIEXPORT void JNICALL Java_com_sun_jna_Native_setWideString
 
     str = newWideCString(env, value);
     if (str != NULL) {
-      MEMCPY(env, L2A(addr), str, size);
+      MEMCPY(env, L2A(addr + offset), str, size);
       free((void*)str);
     }
 }
@@ -2711,6 +2794,8 @@ Java_com_sun_jna_Native_sizeof(JNIEnv *env, jclass UNUSED(cls), jint type)
   case com_sun_jna_Native_TYPE_LONG: return sizeof(long);
   case com_sun_jna_Native_TYPE_WCHAR_T: return sizeof(wchar_t);
   case com_sun_jna_Native_TYPE_SIZE_T: return sizeof(size_t);
+  case com_sun_jna_Native_TYPE_BOOL: return sizeof(bool);
+  case com_sun_jna_Native_TYPE_LONG_DOUBLE: return sizeof(long double);
   default:
     {
       char msg[MSG_SIZE];
@@ -2749,11 +2834,17 @@ Java_com_sun_jna_Native_initIDs(JNIEnv *env, jclass cls) {
     throwByName(env, EUnsatisfiedLink,
                 "Can't obtain static method dispose from class com.sun.jna.Native");
   }
-  else if (!(MID_Native_fromNative
+  else if (!(MID_Native_fromNativeCallbackParam
              = (*env)->GetStaticMethodID(env, classNative,
                                          "fromNative", "(Ljava/lang/Class;Ljava/lang/Object;)Lcom/sun/jna/NativeMapped;"))) {
     throwByName(env, EUnsatisfiedLink,
-                "Can't obtain static method fromNative from class com.sun.jna.Native");
+                "Can't obtain static method fromNative(Class, Object) from class com.sun.jna.Native");
+  }
+  else if (!(MID_Native_fromNative
+             = (*env)->GetStaticMethodID(env, classNative,
+                                         "fromNative", "(Ljava/lang/reflect/Method;Ljava/lang/Object;)Lcom/sun/jna/NativeMapped;"))) {
+    throwByName(env, EUnsatisfiedLink,
+                "Can't obtain static method fromNative(Method, Object) from class com.sun.jna.Native");
   }
   else if (!(MID_Native_nativeType
              = (*env)->GetStaticMethodID(env, classNative,
@@ -2769,9 +2860,9 @@ Java_com_sun_jna_Native_initIDs(JNIEnv *env, jclass cls) {
   }
   else if (!(MID_Native_fromNativeTypeMapped
              = (*env)->GetStaticMethodID(env, classNative,
-                                         "fromNative", "(Lcom/sun/jna/FromNativeConverter;Ljava/lang/Object;Ljava/lang/Class;)Ljava/lang/Object;"))) {
+                                         "fromNative", "(Lcom/sun/jna/FromNativeConverter;Ljava/lang/Object;Ljava/lang/reflect/Method;)Ljava/lang/Object;"))) {
     throwByName(env, EUnsatisfiedLink,
-                "Can't obtain static method fromNative from class com.sun.jna.Native");
+                "Can't obtain static method fromNative(FromNativeConverter, Object, Method) from class com.sun.jna.Native");
   }
   else if (!LOAD_CREF(env, Structure, "com/sun/jna/Structure")) {
     throwByName(env, EUnsatisfiedLink,
@@ -2880,6 +2971,10 @@ Java_com_sun_jna_Native_initIDs(JNIEnv *env, jclass cls) {
     throwByName(env, EUnsatisfiedLink,
                 "Can't obtain constructor for class com.sun.jna.WString");
   }
+  else if (!LOAD_CREF(env, JNIEnv, "com/sun/jna/JNIEnv")) {
+    throwByName(env, EUnsatisfiedLink,
+                "Can't obtain class com.sun.jna.JNIEnv");
+  }
   else if (!LOAD_CREF(env, _ffi_callback, "com/sun/jna/Native$ffi_callback")) {
     throwByName(env, EUnsatisfiedLink,
                 "Can't obtain class com.sun.jna.Native$ffi_callback");
@@ -2888,6 +2983,15 @@ Java_com_sun_jna_Native_initIDs(JNIEnv *env, jclass cls) {
                      "invoke", "(JJJ)V")) {
     throwByName(env, EUnsatisfiedLink,
                 "Can't obtain invoke method from class com.sun.jna.Native$ffi_callback");
+  }
+  else if (!LOAD_CREF(env, FromNativeConverter, "com/sun/jna/FromNativeConverter")) {
+    throwByName(env, EUnsatisfiedLink,
+                "Can't obtain class com.sun.jna.FromNativeConverter");
+  }
+  else if (!LOAD_MID(env, MID_FromNativeConverter_nativeType, classFromNativeConverter, 
+                "nativeType", "()Ljava/lang/Class;")) {
+    throwByName(env, EUnsatisfiedLink,
+                "Can't obtain method nativeType for class com.sun.jna.FromNativeConverter");
   }
   // Initialize type fields within Structure.FFIType
   else {
@@ -2978,11 +3082,9 @@ Java_com_sun_jna_Native_getWindowHandle0(JNIEnv* UNUSED_JAWT(env), jclass UNUSED
       const wchar_t* suffix = L"/bin/jawt.dll";
       size_t len = wcslen(prop) + wcslen(suffix) + 1;
       path = (wchar_t*)alloca(len * sizeof(wchar_t));
-#ifdef _MSC_VER
+
       swprintf(path, len, L"%s%s", prop, suffix);
-#else
-      swprintf(path, L"%s%s", prop, suffix);
-#endif
+      
       free((void *)prop);
     }
 #undef JAWT_NAME
@@ -2994,7 +3096,7 @@ Java_com_sun_jna_Native_getWindowHandle0(JNIEnv* UNUSED_JAWT(env), jclass UNUSED
       return -1;
     }
     if ((pJAWT_GetAWT = (void*)FIND_ENTRY(jawt_handle, METHOD_NAME)) == NULL) {
-      char msg[MSG_SIZE], buf[MSG_SIZE];
+      char msg[MSG_SIZE], buf[MSG_SIZE - 31 /* literal characters */ - sizeof(METHOD_NAME)];
       snprintf(msg, sizeof(msg), "Error looking up JAWT method %s: %s",
                METHOD_NAME, LOAD_ERROR(buf, sizeof(buf)));
       throwByName(env, EUnsatisfiedLink, msg);
@@ -3088,15 +3190,17 @@ Java_com_sun_jna_Native__1getDirectBufferPointer(JNIEnv *env, jclass UNUSED(clas
   return A2L(addr);
 }
 
+#ifdef HAVE_PROTECTION
 JNIEXPORT void JNICALL
 Java_com_sun_jna_Native_setProtected(JNIEnv *UNUSED(env), jclass UNUSED(classp), jboolean protect_access) {
-#ifdef HAVE_PROTECTION
   _protect = protect_access;
-#else
-  // avoid compiler warning
-  protect_access = 0;
-#endif
 }
+#else
+JNIEXPORT void JNICALL
+Java_com_sun_jna_Native_setProtected(JNIEnv *UNUSED(env), jclass UNUSED(classp), jboolean UNUSED(protect_access)) {
+  /* Unsupported */
+}
+#endif
 
 jboolean
 is_protected() {
@@ -3250,7 +3354,7 @@ Java_com_sun_jna_Native_unregister(JNIEnv *env, jclass UNUSED(ncls), jclass cls,
       }
     }
     if (md->from_native) (*env)->DeleteWeakGlobalRef(env, md->from_native);
-    if (md->closure_rclass) (*env)->DeleteWeakGlobalRef(env, md->closure_rclass);
+    if (md->closure_method) (*env)->DeleteGlobalRef(env, md->closure_method);
     free(md->arg_types);
     free(md->closure_arg_types);
     free(md->flags);
@@ -3277,7 +3381,7 @@ Java_com_sun_jna_Native_registerMethod(JNIEnv *env, jclass UNUSED(ncls),
                                        jint rconversion,
                                        jlong closure_return_type,
                                        jlong return_type,
-                                       jclass closure_rclass,
+                                       jobject closure_method,
                                        jlong function, jint cc,
                                        jboolean throw_last_error,
                                        jobjectArray to_native,
@@ -3315,7 +3419,7 @@ Java_com_sun_jna_Native_registerMethod(JNIEnv *env, jclass UNUSED(ncls),
   data->closure_arg_types = malloc(sizeof(ffi_type*) * (argc + 2));
   data->closure_arg_types[0] = &ffi_type_pointer;
   data->closure_arg_types[1] = &ffi_type_pointer;
-  data->closure_rclass = NULL;
+  data->closure_method = NULL;
   data->flags = cvts ? malloc(sizeof(jint)*argc) : NULL;
   data->rflag = rconversion;
   data->to_native = NULL;
@@ -3342,7 +3446,7 @@ Java_com_sun_jna_Native_registerMethod(JNIEnv *env, jclass UNUSED(ncls),
   if (closure_types) (*env)->ReleaseLongArrayElements(env, closure_atypes, closure_types, 0);
   if (cvts) (*env)->ReleaseIntArrayElements(env, conversions, cvts, 0);
   data->fptr = L2A(function);
-  data->closure_rclass = (*env)->NewWeakGlobalRef(env, closure_rclass);
+  data->closure_method = (*env)->NewGlobalRef(env, closure_method);
 
   status = ffi_prep_cif(closure_cif, abi, argc+2, closure_rtype, data->closure_arg_types);
   if (ffi_error(env, "Native method mapping", status)) {

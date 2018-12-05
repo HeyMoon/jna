@@ -1,27 +1,37 @@
 /* Copyright (c) 2007 Timothy Wall, All Rights Reserved
  *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
+ * 
+ * You can freely decide which license you want to apply to 
+ * the project.
+ * 
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
 package com.sun.jna;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.InputStream;
+import java.lang.ref.Reference;
 import java.lang.ref.WeakReference;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.Collections;
+
 import com.sun.jna.win32.W32APIOptions;
 
 import junit.framework.TestCase;
@@ -59,13 +69,13 @@ public class NativeLibraryTest extends TestCase {
 
     public void testGCNativeLibrary() throws Exception {
         NativeLibrary lib = NativeLibrary.getInstance("testlib");
-        WeakReference ref = new WeakReference(lib);
+        Reference<NativeLibrary> ref = new WeakReference<NativeLibrary>(lib);
         lib = null;
         System.gc();
         long start = System.currentTimeMillis();
         while (ref.get() != null) {
             Thread.sleep(10);
-            if (System.currentTimeMillis() - start > 5000)
+            if ((System.currentTimeMillis() - start) > 5000L)
                 break;
         }
         assertNull("Library not GC'd", ref.get());
@@ -77,7 +87,7 @@ public class NativeLibraryTest extends TestCase {
         // occasionally get the same library handle back on subsequent dlopen
         Thread.sleep(2);
 
-        TestLibrary lib = Native.loadLibrary("testlib", TestLibrary.class);
+        TestLibrary lib = Native.load("testlib", TestLibrary.class);
         assertEquals("Library should be newly loaded after explicit dispose of all native libraries",
                      1, lib.callCount());
         if (lib.callCount() <= 1) {
@@ -86,28 +96,28 @@ public class NativeLibraryTest extends TestCase {
     }
 
     public void testUseSingleLibraryInstance() {
-        TestLibrary lib = Native.loadLibrary("testlib", TestLibrary.class);
+        TestLibrary lib = Native.load("testlib", TestLibrary.class);
         int count = lib.callCount();
-        TestLibrary lib2 = Native.loadLibrary("testlib", TestLibrary.class);
+        TestLibrary lib2 = Native.load("testlib", TestLibrary.class);
         int count2 = lib2.callCount();
         assertEquals("Interfaces should share a library instance",
                      count + 1, count2);
     }
 
     public void testAliasLibraryFilename() {
-        TestLibrary lib = Native.loadLibrary("testlib", TestLibrary.class);
+        TestLibrary lib = Native.load("testlib", TestLibrary.class);
         int count = lib.callCount();
         NativeLibrary nl = NativeLibrary.getInstance("testlib");
-        TestLibrary lib2 = Native.loadLibrary(nl.getFile().getName(), TestLibrary.class);
+        TestLibrary lib2 = Native.load(nl.getFile().getName(), TestLibrary.class);
         int count2 = lib2.callCount();
         assertEquals("Simple filename load not aliased", count + 1, count2);
     }
 
     public void testAliasLibraryFullPath() {
-        TestLibrary lib = Native.loadLibrary("testlib", TestLibrary.class);
+        TestLibrary lib = Native.load("testlib", TestLibrary.class);
         int count = lib.callCount();
         NativeLibrary nl = NativeLibrary.getInstance("testlib");
-        TestLibrary lib2 = Native.loadLibrary(nl.getFile().getAbsolutePath(), TestLibrary.class);
+        TestLibrary lib2 = Native.load(nl.getFile().getAbsolutePath(), TestLibrary.class);
         int count2 = lib2.callCount();
         assertEquals("Full pathname load not aliased", count + 1, count2);
     }
@@ -115,18 +125,19 @@ public class NativeLibraryTest extends TestCase {
     public void testAliasSimpleLibraryName() throws Exception {
         NativeLibrary nl = NativeLibrary.getInstance("testlib");
         File file = nl.getFile();
-        WeakReference ref = new WeakReference(nl);
+        Reference<NativeLibrary> ref = new WeakReference<NativeLibrary>(nl);
         nl = null;
         System.gc();
         long start = System.currentTimeMillis();
         while (ref.get() != null) {
             Thread.sleep(10);
-            if (System.currentTimeMillis() - start > 5000)
+            if ((System.currentTimeMillis() - start) > 5000L) {
                 fail("Timed out waiting for library to be GC'd");
+            }
         }
-        TestLibrary lib = Native.loadLibrary(file.getAbsolutePath(), TestLibrary.class);
+        TestLibrary lib = Native.load(file.getAbsolutePath(), TestLibrary.class);
         int count = lib.callCount();
-        TestLibrary lib2 = Native.loadLibrary("testlib", TestLibrary.class);
+        TestLibrary lib2 = Native.load("testlib", TestLibrary.class);
         int count2 = lib2.callCount();
         assertEquals("Simple library name not aliased", count + 1, count2);
     }
@@ -135,9 +146,9 @@ public class NativeLibraryTest extends TestCase {
         NativeLibrary lib = NativeLibrary.getInstance("testlib");
         try {
             Function f = lib.getFunction(null);
-            fail("Function must have a name");
-        }
-        catch(NullPointerException e) {
+            fail("Function must have a name: " + f);
+        } catch(NullPointerException e) {
+            // expected
         }
     }
 
@@ -154,19 +165,18 @@ public class NativeLibraryTest extends TestCase {
 
     public void testFunctionHoldsLibraryReference() throws Exception {
         NativeLibrary lib = NativeLibrary.getInstance("testlib");
-        WeakReference ref = new WeakReference(lib);
+        Reference<NativeLibrary> ref = new WeakReference<NativeLibrary>(lib);
         Function f = lib.getFunction("callCount");
         lib = null;
         System.gc();
-        long start = System.currentTimeMillis();
-        while (ref.get() != null && System.currentTimeMillis() - start < 2000) {
+        for (long start = System.currentTimeMillis(); (ref.get() != null) && ((System.currentTimeMillis() - start) < 2000L); ) {
             Thread.sleep(10);
         }
         assertNotNull("Library GC'd when it should not be", ref.get());
         f.invokeInt(new Object[0]);
         f = null;
         System.gc();
-        while (ref.get() != null && System.currentTimeMillis() - start < 5000) {
+        for (long start = System.currentTimeMillis(); (ref.get() != null) && ((System.currentTimeMillis() - start) < 5000L); ) {
             Thread.sleep(10);
         }
         assertNull("Library not GC'd", ref.get());
@@ -195,10 +205,9 @@ public class NativeLibraryTest extends TestCase {
     	File lib1_1 = new File(dir, "lib" + name + ".so.1.1");
         lib1_1.createNewFile();
     	lib1_1.deleteOnExit();
-        List path = Arrays.asList(new String[] { dir.getCanonicalPath() });
-    	assertEquals("Latest versioned library not found when unversioned requested",
+    	assertEquals("Latest versioned library not found when unversioned requested for path=" + dir,
                      lib1_1.getCanonicalPath(),
-                     NativeLibrary.matchLibrary(name, path));
+                     NativeLibrary.matchLibrary(name, Collections.singletonList(dir.getCanonicalPath())));
     }
 
     public void testAvoidFalseMatch() throws Exception {
@@ -210,10 +219,9 @@ public class NativeLibraryTest extends TestCase {
         File lib1 = new File(dir, "lib" + name + "-client.so.2");
         lib1.createNewFile();
         lib1.deleteOnExit();
-        List path = Arrays.asList(new String[] { dir.getCanonicalPath() });
-    	assertEquals("Library with similar prefix should be ignored",
+    	assertEquals("Library with similar prefix should be ignored for path=" + dir,
                      lib0.getCanonicalPath(),
-                     NativeLibrary.matchLibrary(name, path));
+                     NativeLibrary.matchLibrary(name, Collections.singletonList(dir.getCanonicalPath())));
     }
 
     public void testParseVersion() throws Exception {
@@ -264,9 +272,7 @@ public class NativeLibraryTest extends TestCase {
     }
 
     public void testLoadLibraryWithOptions() {
-        Map options = new HashMap();
-        options.put(Library.OPTION_OPEN_FLAGS, new Integer(-1));
-        Native.loadLibrary("testlib", TestLibrary.class, options);
+        Native.load("testlib", TestLibrary.class, Collections.singletonMap(Library.OPTION_OPEN_FLAGS, Integer.valueOf(-1)));
     }
 
     public interface Kernel32 {
@@ -284,16 +290,14 @@ public class NativeLibraryTest extends TestCase {
         assertTrue("GetLastError should be a Function", Function.class.isAssignableFrom(get.getClass()));
         assertTrue("GetLastError should be a customized Function", get.getClass() != Function.class);
         final int EXPECTED = 42;
-        set.invokeVoid(new Object[] { new Integer(EXPECTED) });
+        set.invokeVoid(new Object[] { Integer.valueOf(EXPECTED) });
         assertEquals("Wrong error", EXPECTED, get.invokeInt(null));
     }
 
     public void testCleanupOnLoadError() throws Exception {
-        Map options = new HashMap();
-        options.put(Library.OPTION_CLASSLOADER, new DisfunctClassLoader());
         int previousTempFileCount = Native.getTempDir().listFiles().length;
         try {
-            NativeLibrary.getInstance("disfunct", options);
+            NativeLibrary.getInstance("disfunct", Collections.singletonMap(Library.OPTION_CLASSLOADER, new DisfunctClassLoader()));
             fail("Expected NativeLibrary.getInstance() to fail with an UnsatisfiedLinkError here.");
         } catch(UnsatisfiedLinkError e) {
             int currentTempFileCount = Native.getTempDir().listFiles().length;

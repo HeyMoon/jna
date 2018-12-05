@@ -1,22 +1,32 @@
 /* Copyright (c) 2015 Goldstein Lyor, All Rights Reserved
  *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
+ * 
+ * You can freely decide which license you want to apply to 
+ * the project.
+ * 
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
 package com.sun.jna.platform.win32;
 
-import java.util.Arrays;
-import java.util.List;
-
 import com.sun.jna.Native;
+import com.sun.jna.Pointer;
 import com.sun.jna.Structure;
+import com.sun.jna.Structure.FieldOrder;
 import com.sun.jna.platform.win32.BaseTSD.DWORD_PTR;
 import com.sun.jna.platform.win32.WinBase.FILETIME;
 import com.sun.jna.platform.win32.WinDef.DWORDByReference;
@@ -32,7 +42,7 @@ import com.sun.jna.win32.W32APIOptions;
  * @see <A HREF="https://msdn.microsoft.com/en-us/library/windows/desktop/aa373083(v=vs.85).aspx">Performance Counters</A>
  */
 public interface Pdh extends StdCallLibrary {
-    Pdh INSTANCE = Native.loadLibrary("Pdh", Pdh.class, W32APIOptions.DEFAULT_OPTIONS);
+    Pdh INSTANCE = Native.load("Pdh", Pdh.class, W32APIOptions.DEFAULT_OPTIONS);
 
     /** Maximum counter name length. */
     int PDH_MAX_COUNTER_NAME = 1024;
@@ -43,11 +53,17 @@ public interface Pdh extends StdCallLibrary {
     /** Maximum full counter log name length. */
     int PDH_MAX_DATASOURCE_PATH = 1024;
 
+    int PDH_MORE_DATA = 0x800007D2;
+    int PDH_INVALID_ARGUMENT =  0xC0000BBD;
+    int PDH_MEMORY_ALLOCATION_FAILURE = 0xC0000BBB;
+    int PDH_CSTATUS_NO_MACHINE = 0x800007D0;
+    int PDH_CSTATUS_NO_OBJECT = 0xC0000BB8;
+
     /* TODO
      * LPVOID CALLBACK AllocateMemory(_In_ SIZE_T AllocSize,_In_ LPVOID pContext)
      * void CALLBACK FreeMemory(LPVOID pBuffer,LPVOID pContext)
      */
-    
+
     /**
      * Connects to the specified computer.
      * @param szMachineName The name of the computer to connect to. If
@@ -84,7 +100,7 @@ public interface Pdh extends StdCallLibrary {
      * @see <A HREF="https://msdn.microsoft.com/en-us/library/windows/desktop/aa372652(v=vs.85).aspx">PdhOpenQuery</A>
      */
     int PdhOpenQuery(String szDataSource, DWORD_PTR dwUserData, HANDLEByReference phQuery);
-    
+
     /**
      * Closes all counters contained in the specified query, closes all
      * handles related to the query, and frees all memory associated with
@@ -100,6 +116,8 @@ public interface Pdh extends StdCallLibrary {
      * @see <A HREF="https://msdn.microsoft.com/en-us/library/windows/desktop/aa373041(v=vs.85).aspx">PDH_COUNTER_PATH_ELEMENTS</A>
      * @see <A HREF="https://technet.microsoft.com/en-us/library/cc776490(v=ws.10).aspx">Windows Server 2003 Performance Counters Reference</A>
      */
+    @FieldOrder({"szMachineName", "szObjectName", "szInstanceName",
+                "szParentInstance", "dwInstanceIndex", "szCounterName"})
     public class PDH_COUNTER_PATH_ELEMENTS extends Structure {
         public String szMachineName;
         public String szObjectName;
@@ -107,12 +125,6 @@ public interface Pdh extends StdCallLibrary {
         public String szParentInstance;
         public int  dwInstanceIndex;
         public String szCounterName;
-
-        @Override
-        protected List<String> getFieldOrder() {
-            return Arrays.asList("szMachineName", "szObjectName", "szInstanceName",
-                        "szParentInstance", "dwInstanceIndex", "szCounterName");
-        }
     }
 
     // flags for the PdhMakeCounterPath
@@ -131,7 +143,7 @@ public interface Pdh extends StdCallLibrary {
      * zero on input, the function returns PDH_MORE_DATA and sets this parameter
      * to the required buffer size. If the buffer is larger than the required
      * size, the function sets this parameter to the actual size of the buffer
-     * that was used. 
+     * that was used.
      * @param dwFlags Format of the input and output counter values.
      * @return ERROR_SUCCESS (or PDH_MORE_DATA)
      * @see <A HREF="https://msdn.microsoft.com/en-us/library/windows/desktop/aa372649(v=vs.85).aspx">PdhMakeCounterPath</A>
@@ -165,6 +177,7 @@ public interface Pdh extends StdCallLibrary {
      * formatting, or other interpretation is performed on the data.
      * @see <A HREF="https://msdn.microsoft.com/en-us/library/windows/desktop/aa373060(v=vs.85).aspx">PDH_RAW_COUNTER</A>
      */
+    @FieldOrder({"CStatus", "TimeStamp", "FirstValue", "SecondValue", "MultiCount"})
     public class PDH_RAW_COUNTER extends Structure {
         /** Counter status that indicates if the counter value is valid. */
         public int CStatus;
@@ -180,11 +193,6 @@ public interface Pdh extends StdCallLibrary {
          * calculation
          */
         public int MultiCount;
-
-        @Override
-        protected List<String> getFieldOrder() {
-            return Arrays.asList("CStatus", "TimeStamp", "FirstValue", "SecondValue", "MultiCount");
-        }
     }
 
     /**
@@ -226,7 +234,7 @@ public interface Pdh extends StdCallLibrary {
      * @see <A HREF="https://msdn.microsoft.com/en-us/library/windows/desktop/aa372563(v=vs.85).aspx">PdhCollectQueryData</A>
      */
     int PdhCollectQueryData(HANDLE hQuery);
-    
+
     /**
      * Uses a separate thread to collect the current raw data value for all counters
      * in the specified query. The function then signals the application-defined
@@ -241,7 +249,7 @@ public interface Pdh extends StdCallLibrary {
      * @see <A HREF="https://msdn.microsoft.com/en-us/library/windows/desktop/aa372566(v=vs.85).aspx">PdhCollectQueryDataEx</A>
      */
     int PdhCollectQueryDataEx(HANDLE hQuery, int dwIntervalTime, HANDLE hNewDataEvent);
-    
+
     /**
      * Collects the current raw data value for all counters in the specified
      * query and updates the status code of each counter.
@@ -252,11 +260,12 @@ public interface Pdh extends StdCallLibrary {
      * @see <A HREF="https://msdn.microsoft.com/en-us/library/windows/desktop/aa372569(v=vs.85).aspx">PdhCollectQueryDataWithTime</A>
      */
     int PdhCollectQueryDataWithTime(HANDLE hQuery, LONGLONGByReference pllTimeStamp);
-    
+
     /**
      * Information on time intervals as applied to the sampling of performance data.
      * @see <A HREF="https://msdn.microsoft.com/en-us/library/windows/desktop/aa373071(v=vs.85).aspx">PDH_TIME_INFO</A>
      */
+    @FieldOrder({"StartTime", "EndTime", "SampleCount"})
     public class PDH_TIME_INFO extends Structure {
         /** Starting time of the sample interval, in local FILETIME format. */
         public long StartTime;
@@ -264,17 +273,135 @@ public interface Pdh extends StdCallLibrary {
         public long EndTime;
         /** Number of samples collected during the interval. */
         public int SampleCount;
-        
-        protected List<String> getFieldOrder() {
-            return Arrays.asList("StartTime", "EndTime", "SampleCount");
-        }
     }
-    
+
     /**
-     * @param hQuery Handle to the query. 
-     * @param pInfo A {@link PDH_TIME_INFO} structure that specifies the time range. 
+     * @param hQuery Handle to the query.
+     * @param pInfo A {@link PDH_TIME_INFO} structure that specifies the time range.
      * @return ERROR_SUCCESS if successful
      * @see <A HREF="https://msdn.microsoft.com/en-us/library/windows/desktop/aa372677(v=vs.85).aspx">PdhSetQueryTimeRange</A>
      */
     int PdhSetQueryTimeRange(HANDLE hQuery, PDH_TIME_INFO pInfo);
+
+    /**
+     * Returns the specified object's counter and instance names that exist on
+     * the specified computer or in the specified log file.
+     * 
+     * @param szDataSource
+     *            String that specifies the name of the log file used to
+     *            enumerate the counter and instance names. If NULL, the
+     *            function uses the computer specified in the szMachineName
+     *            parameter to enumerate the names.
+     * @param szMachineName
+     *            String that specifies the name of the computer that contains
+     *            the counter and instance names that you want to enumerate.
+     *            Include the leading slashes in the computer name, for example,
+     *            \\computername. If the szDataSource parameter is NULL, you can
+     *            set szMachineName to NULL to specify the local computer.
+     * @param szObjectName
+     *            String that specifies the name of the object whose counter and
+     *            instance names you want to enumerate.
+     * @param mszCounterList
+     *            Caller-allocated buffer that receives a list of
+     *            null-terminated counter names provided by the specified
+     *            object. The list contains unique counter names. The list is
+     *            terminated by two NULL characters. Set to NULL if the
+     *            pcchCounterListLengthparameter is zero.
+     * @param pcchCounterListLength
+     *            Size of the mszCounterList buffer, in TCHARs. If zero on input
+     *            and the object exists, the function returns PDH_MORE_DATA and
+     *            sets this parameter to the required buffer size. If the buffer
+     *            is larger than the required size, the function sets this
+     *            parameter to the actual size of the buffer that was used. If
+     *            the specified size on input is greater than zero but less than
+     *            the required size, you should not rely on the returned size to
+     *            reallocate the buffer.
+     * @param mszInstanceList
+     *            Caller-allocated buffer that receives a list of
+     *            null-terminated instance names provided by the specified
+     *            object. The list contains unique instance names. The list is
+     *            terminated by two NULL characters. Set to NULL if
+     *            pcchInstanceListLength is zero.
+     * @param pcchInstanceListLength
+     *            Size of the mszInstanceList buffer, in TCHARs. If zero on
+     *            input and the object exists, the function returns
+     *            PDH_MORE_DATA and sets this parameter to the required buffer
+     *            size. If the buffer is larger than the required size, the
+     *            function sets this parameter to the actual size of the buffer
+     *            that was used. If the specified size on input is greater than
+     *            zero but less than the required size, you should not rely on
+     *            the returned size to reallocate the buffer. If the specified
+     *            object does not support variable instances, then the returned
+     *            value will be zero. If the specified object does support
+     *            variable instances, but does not currently have any instances,
+     *            then the value returned is 2, which is the size of an empty
+     *            MULTI_SZ list string.
+     * @param dwDetailLevel
+     *            Detail level of the performance items to return. All items
+     *            that are of the specified detail level or less will be
+     *            returned.
+     * @param dwFlags
+     *            This parameter must be zero.
+     * @return If the function succeeds, it returns ERROR_SUCCESS. If the
+     *         function fails, the return value is a system error code or a PDH
+     *         error code.
+     * @see <A HREF=
+     *      "https://msdn.microsoft.com/en-us/library/windows/desktop/aa372677(v=vs.85).aspx">PdhEnumObjectItems</A>
+     */
+    int PdhEnumObjectItems(String szDataSource, String szMachineName, String szObjectName, Pointer mszCounterList,
+            DWORDByReference pcchCounterListLength, Pointer mszInstanceList, DWORDByReference pcchInstanceListLength,
+            int dwDetailLevel, int dwFlags);
+
+    /**
+     * Returns the counter index corresponding to the specified counter name.
+     * 
+     * @param szMachineName
+     *            Null-terminated string that specifies the name of the computer
+     *            where the specified counter is located. The computer name can
+     *            be specified by the DNS name or the IP address. If NULL, the
+     *            function uses the local computer.
+     * @param szNameBuffer
+     *            Null-terminated string that contains the counter name.
+     * @param pdwIndex
+     *            Index of the counter.
+     * @return If the function succeeds, it returns ERROR_SUCCESS. If the
+     *         function fails, the return value is a system error code or a PDH
+     *         error code.
+     * @see <A HREF=
+     *      "https://msdn.microsoft.com/en-us/library/windows/desktop/aa372647(v=vs.85).aspx">PdhLookupPerfIndexByName</A>
+     */
+    int PdhLookupPerfIndexByName(String szMachineName, String szNameBuffer, DWORDByReference pdwIndex);
+
+    /**
+     * Returns the performance object name or counter name corresponding to the
+     * specified index.
+     * 
+     * @param szMachineName
+     *            Null-terminated string that specifies the name of the computer
+     *            where the specified performance object or counter is located.
+     *            The computer name can be specified by the DNS name or the IP
+     *            address. If NULL, the function uses the local computer.
+     * @param dwNameIndex
+     *            Index of the performance object or counter.
+     * @param szNameBuffer
+     *            Caller-allocated buffer that receives the null-terminated name
+     *            of the performance object or counter. Set to NULL if
+     *            pcchNameBufferSize is zero.
+     * @param pcchNameBufferSize
+     *            Size of the szNameBuffer buffer, in TCHARs. If zero on input,
+     *            the function returns PDH_MORE_DATA and sets this parameter to
+     *            the required buffer size. If the buffer is larger than the
+     *            required size, the function sets this parameter to the actual
+     *            size of the buffer that was used. If the specified size on
+     *            input is greater than zero but less than the required size,
+     *            you should not rely on the returned size to reallocate the
+     *            buffer.
+     * @return If the function succeeds, it returns ERROR_SUCCESS. If the
+     *         function fails, the return value is a system error code or a PDH
+     *         error code.
+     * @see <A HREF=
+     *      "https://msdn.microsoft.com/en-us/library/windows/desktop/aa372648(v=vs.85).aspx">PdhLookupPerfNameByIndex</A>
+     */
+    int PdhLookupPerfNameByIndex(String szMachineName, int dwNameIndex, Pointer szNameBuffer,
+            DWORDByReference pcchNameBufferSize);
 }

@@ -1,14 +1,25 @@
 /* Copyright (c) 2014 Dr David H. Akehurst (itemis), All Rights Reserved
  *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
+ * 
+ * You can freely decide which license you want to apply to 
+ * the project.
+ * 
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
 package com.sun.jna.platform.win32.COM.util;
 
@@ -26,7 +37,8 @@ import com.sun.jna.platform.win32.WinNT;
 import com.sun.jna.platform.win32.COM.COMUtils;
 
 public class ComThread {
-
+        private static ThreadLocal<Boolean> isCOMThread = new ThreadLocal<Boolean>();
+    
 	ExecutorService executor;
 	Runnable firstTask;
 	boolean requiresInitialisation;
@@ -50,6 +62,7 @@ public class ComThread {
 					// [http://www.codeguru.com/cpp/com-tech/activex/apts/article.php/c5529/Understanding-COM-Apartments-Part-I.htm]
 					// [http://www.codeguru.com/cpp/com-tech/activex/apts/article.php/c5533/Understanding-COM-Apartments-Part-II.htm]
 					WinNT.HRESULT hr = Ole32.INSTANCE.CoInitializeEx(null, coinitialiseExFlag);
+                                        isCOMThread.set(true);
 					COMUtils.checkRC(hr);
 					ComThread.this.requiresInitialisation = false;
 				} catch (Throwable t) {
@@ -119,11 +132,30 @@ public class ComThread {
 		}
 	}
 
+        static void setComThread(boolean value) {
+            isCOMThread.set(value);
+        }
+        
 	public <T> T execute(Callable<T> task) throws TimeoutException, InterruptedException, ExecutionException {
-		if (this.requiresInitialisation) {
-			executor.execute(firstTask);
-		}
-		return executor.submit(task).get(this.timeoutMilliseconds, TimeUnit.MILLISECONDS);
+                // If the call is done on a COM thread, invoke directly
+                // if the call comes from outside the invokation is dispatched
+                // into the Dispatch Thread.
+                Boolean comThread = isCOMThread.get();
+                if(comThread == null) {
+                        comThread = false;
+                }
+                if(comThread) {
+                        try {
+                                return task.call();
+                        } catch (Exception ex) {
+                                throw new ExecutionException(ex);
+                        }
+                } else {
+                        if (this.requiresInitialisation) {
+                                executor.execute(firstTask);
+                        }
+                        return executor.submit(task).get(this.timeoutMilliseconds, TimeUnit.MILLISECONDS);
+                }
 	}
 
 }

@@ -1,15 +1,26 @@
 /* Copyright (c) 2007-2013 Timothy Wall, All Rights Reserved
  * Copyright (c) 2007 Wayne Meissner, All Rights Reserved
  *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- * <p/>
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.  
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
+ * 
+ * You can freely decide which license you want to apply to 
+ * the project.
+ * 
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
 
 #include <stdio.h>
@@ -393,7 +404,7 @@ invoke_callback(JNIEnv* env, callback *cb, ffi_cif* cif, void *resp, void **cbar
         case CVT_NATIVE_MAPPED_WSTRING:
 	  // Make sure we have space enough for the new argument
 	  args[i+3] = alloca(sizeof(void *));
-	  *((void **)args[i+3]) = fromNative(env, cb->arg_classes[i], cif->arg_types[i], cbargs[i], JNI_FALSE, cb->encoding);
+	  *((void **)args[i+3]) = fromNativeCallbackParam(env, cb->arg_classes[i], cif->arg_types[i], cbargs[i], JNI_FALSE, cb->encoding);
           break;
         case CVT_POINTER:
           *((void **)args[i+3]) = newJavaPointer(env, *(void **)cbargs[i]);
@@ -675,6 +686,14 @@ dispatch_callback(ffi_cif* cif, void* resp, void** cbargs, void* user_data) {
     else {
       attach_status = (*jvm)->AttachCurrentThread(jvm, (void *)&env, &args);
     }
+    if (attach_status != JNI_OK) {
+      free((void *)args.name);
+      if (args.group) {
+        (*env)->DeleteWeakGlobalRef(env, args.group);
+      }
+      fprintf(stderr, "JNA: Can't attach native thread to VM for callback: %d (check stacksize for callbacks)\n", attach_status);
+      return;
+    }
     tls = get_thread_storage(env);
     if (tls) {
       snprintf(tls->name, sizeof(tls->name), "%s", args.name ? args.name : "<unconfigured native thread>");
@@ -682,16 +701,12 @@ dispatch_callback(ffi_cif* cif, void* resp, void** cbargs, void* user_data) {
       tls->jvm_thread = JNI_FALSE;
     }
     // Dispose of allocated memory
-    free(args.name);
-    if (attach_status != JNI_OK) {
-      fprintf(stderr, "JNA: Can't attach native thread to VM for callback: %d\n", attach_status);
-      return;
-    }
+    free((void *)args.name);
     if (args.group) {
       (*env)->DeleteWeakGlobalRef(env, args.group);
     }
   }
-						
+
   if (!tls) {
     fprintf(stderr, "JNA: couldn't obtain thread-local storage\n");
     return;

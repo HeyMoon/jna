@@ -1,14 +1,25 @@
 /* Copyright (c) 2012 Tobias Wolf, All Rights Reserved
  * 
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
  * 
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.  
+ * You can freely decide which license you want to apply to 
+ * the project.
+ * 
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
 package com.sun.jna.platform.win32.COM;
 
@@ -81,7 +92,7 @@ public interface IDispatch extends IUnknown {
      * @param lcid      The locale context in which to interpret the names.
      * @param rgDispId  Caller-allocated array, each element of which contains an identifier (ID) corresponding to one of the names passed in
      *                  the rgszNames array. The first element represents the member name. The subsequent elements represent each of the member's parameters.
-     * @return
+     * @return status of the operation
      */
     public HRESULT GetIDsOfNames(REFIID riid, WString[] rgszNames, int cNames,
             LCID lcid, DISPIDByReference rgDispId);
@@ -108,7 +119,7 @@ public interface IDispatch extends IUnknown {
      * @param pDispParams  Pointer to a DISPPARAMS structure containing an array of arguments, an array of argument DISPIDs for named arguments, and counts for the number of elements in the arrays.
      * @param pVarResult   Pointer to the location where the result is to be stored, or NULL if the caller expects no result. This argument is ignored if DISPATCH_PROPERTYPUT or DISPATCH_PROPERTYPUTREF is specified.
      * @param pExcepInfo   Pointer to a structure that contains exception information. This structure should be filled in if DISP_E_EXCEPTION is returned. Can be NULL.
-     * @param puArgErr     The index within rgvarg of the first argument that has an error. Arguments are stored in pDispParams->rgvarg in reverse order,
+     * @param puArgErr     The index within rgvarg of the first argument that has an error. Arguments are stored in pDispParams-&gt;rgvarg in reverse order,
      *                     so the first argument is the one with the highest index in the array. This parameter is returned only when the resulting return
      *                     value is DISP_E_TYPEMISMATCH or DISP_E_PARAMNOTFOUND. This argument can be set to null. For details, see Returning Errors.
      * @return This method can return one of these values.

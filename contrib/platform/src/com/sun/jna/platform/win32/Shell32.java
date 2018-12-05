@@ -1,18 +1,30 @@
 /* Copyright (c) 2007, 2013 Timothy Wall, Markus Karg, All Rights Reserved
  *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- * <p/>
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.  
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
+ * 
+ * You can freely decide which license you want to apply to 
+ * the project.
+ * 
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
 package com.sun.jna.platform.win32;
 
 import com.sun.jna.Native;
+import com.sun.jna.WString;
 import com.sun.jna.platform.win32.Guid.GUID;
 import com.sun.jna.platform.win32.WinDef.DWORD;
 import com.sun.jna.platform.win32.WinDef.HICON;
@@ -30,7 +42,7 @@ import com.sun.jna.win32.W32APIOptions;
  */
 public interface Shell32 extends ShellAPI, StdCallLibrary {
     /** The instance **/
-    Shell32 INSTANCE = Native.loadLibrary("shell32", Shell32.class, W32APIOptions.DEFAULT_OPTIONS);
+    Shell32 INSTANCE = Native.load("shell32", Shell32.class, W32APIOptions.DEFAULT_OPTIONS);
 
     /**
      * No dialog box confirming the deletion of the objects will be displayed.
@@ -376,5 +388,26 @@ public interface Shell32 extends ShellAPI, StdCallLibrary {
      * @see <a href="https://msdn.microsoft.com/en-us/library/ms648069(VS.85).aspx">MSDN</a>
      */
     int ExtractIconEx(String lpszFile, int nIconIndex, HICON[] phiconLarge, HICON[] phiconSmall, int nIcons);
+
+    /**
+     * Retrieves the application-defined, explicit Application User Model ID (AppUserModelID) for the current process.
+     * 
+     * @param ppszAppID
+     *            A pointer that receives the address of the AppUserModelID assigned to the process. The caller is responsible for freeing this string with {@link Ole32#CoTaskMemFree} when it is no longer needed.
+     * @return If this function succeeds, it returns S_OK. Otherwise, it returns an HRESULT error code.
+     * @see <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/dd378419(v=vs.85).aspx">MSDN</a>
+     */
+    HRESULT GetCurrentProcessExplicitAppUserModelID(PointerByReference ppszAppID);
+
+    /**
+     * Specifies a unique application-defined Application User Model ID (AppUserModelID) that identifies the current process to the taskbar. This identifier allows an application to group its associated processes and windows under a single taskbar button.
+     * 
+     * @param appID
+     *            The AppUserModelID to assign to the current process.
+     * @return If this function succeeds, it returns S_OK. Otherwise, it returns an HRESULT error code.
+     * @see <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/dd378422(v=vs.85).aspx">MSDN</a>
+     */
+    HRESULT SetCurrentProcessExplicitAppUserModelID(WString appID);
+
 }
 

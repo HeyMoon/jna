@@ -1,17 +1,26 @@
 /* Copyright (c) 2015 Adam Marcionek, All Rights Reserved
- * 
  *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
  * 
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.  
+ * You can freely decide which license you want to apply to 
+ * the project.
+ * 
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
-
 package com.sun.jna.platform.win32;
 
 import com.sun.jna.Native;
@@ -21,7 +30,6 @@ import com.sun.jna.platform.win32.WinNT.HANDLE;
 import com.sun.jna.platform.win32.WinNT.HANDLEByReference;
 import com.sun.jna.platform.win32.Winnetwk.*;
 import com.sun.jna.ptr.IntByReference;
-import com.sun.jna.ptr.PointerByReference;
 import com.sun.jna.win32.StdCallLibrary;
 import com.sun.jna.win32.W32APIOptions;
 
@@ -33,7 +41,7 @@ import com.sun.jna.win32.W32APIOptions;
 
 public interface Mpr extends StdCallLibrary {
 
-    Mpr INSTANCE = Native.loadLibrary("Mpr", Mpr.class, W32APIOptions.DEFAULT_OPTIONS);
+    Mpr INSTANCE = Native.load("Mpr", Mpr.class, W32APIOptions.DEFAULT_OPTIONS);
 
     /**
      * The WNetOpenEnum function starts an enumeration of network resources or
@@ -299,7 +307,7 @@ public interface Mpr extends StdCallLibrary {
      *         (v=vs.85).aspx
      */
     public int WNetUseConnection(HWND hwndOwner, NETRESOURCE lpNETRESOURCE, String lpPassword, String lpUserID, int dwFlags,
-            PointerByReference lpAccessName, IntByReference lpBufferSize, IntByReference lpResult);
+            Pointer lpAccessName, IntByReference lpBufferSize, IntByReference lpResult);
 
     /**
      * The WNetAddConnection3 function makes a connection to a network resource.

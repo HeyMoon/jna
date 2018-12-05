@@ -1,17 +1,29 @@
 /* Copyright (c) 2007 Timothy Wall, All Rights Reserved
  *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- * <p/>
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.  
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
+ * 
+ * You can freely decide which license you want to apply to 
+ * the project.
+ * 
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
 package com.sun.jna.platform.dnd;
 
+import com.sun.jna.Platform;
 import java.awt.AlphaComposite;
 import java.awt.Component;
 import java.awt.Cursor;
@@ -38,6 +50,8 @@ import java.awt.dnd.DropTargetEvent;
 import java.awt.dnd.InvalidDnDOperationException;
 import java.awt.event.InputEvent;
 import java.awt.image.BufferedImage;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.swing.Icon;
 import javax.swing.JColorChooser;
@@ -99,6 +113,8 @@ import javax.swing.text.JTextComponent;
 public abstract class DragHandler 
     implements DragSourceListener, DragSourceMotionListener, DragGestureListener {
 
+    private static final Logger LOG = Logger.getLogger(DragHandler.class.getName());
+
     /** Default maximum size for ghosted images. */
     public static final Dimension MAX_GHOST_SIZE = new Dimension(250, 250);
 
@@ -127,8 +143,7 @@ public abstract class DragHandler
     // w32 others: copy=ctrl
     /** Modifier mask for a user-requested move. */
     static final int MOVE_MASK = InputEvent.SHIFT_DOWN_MASK;
-    static final boolean OSX = 
-        System.getProperty("os.name").toLowerCase().indexOf("mac") != -1;
+    static final boolean OSX = Platform.isMac();
     /** Modifier mask for a user-requested copy. */
     static final int COPY_MASK = 
         OSX ? InputEvent.ALT_DOWN_MASK : InputEvent.CTRL_DOWN_MASK;
@@ -164,16 +179,12 @@ public abstract class DragHandler
     public static Transferable getTransferable(DropTargetEvent e) {
         if (e instanceof DropTargetDragEvent) {
             try {
-                // getTransferable is available during drag only on 1.5+
-                return (Transferable)
-                    e.getClass().getMethod("getTransferable", (Class[])null).invoke(e, (Object[])null);
-            }
-            catch(Exception ex) {
+                return ((DropTargetDragEvent) e).getTransferable();
+            } catch (Exception ex) {
                 // Method not available
             }
-        }
-        else if (e instanceof DropTargetDropEvent) {
-            return ((DropTargetDropEvent)e).getTransferable();
+        } else if (e instanceof DropTargetDropEvent) {
+            return ((DropTargetDropEvent) e).getTransferable();
         }
         return transferable;
     }
@@ -298,6 +309,7 @@ public abstract class DragHandler
      * responsible for initiating the drag operation.
      * @param e event
      */
+    @Override
     public void dragGestureRecognized(DragGestureEvent e) {
         if ((e.getDragAction() & supportedActions) != 0
             && canDrag(e)) {
@@ -478,26 +490,37 @@ public abstract class DragHandler
     }
     private String lastAction;
     private void describe(String type, DragSourceEvent e) {
-        if (false) {
+        if (LOG.isLoggable(Level.FINE)) {
+            StringBuilder msgBuilder = new StringBuilder();
+            msgBuilder.append("drag: ");
+            msgBuilder.append(type);
             DragSourceContext ds = e.getDragSourceContext();
-            String msg = "drag: " + type;
             if (e instanceof DragSourceDragEvent) {
                 DragSourceDragEvent ev = (DragSourceDragEvent)e;
-                msg += ": src=" + actionString(ds.getSourceActions())
-                    + " usr=" + actionString(ev.getUserAction())
-                    + " tgt=" + actionString(ev.getTargetActions())
-                    + " act=" + actionString(ev.getDropAction())
-                    + " mods=" + ev.getGestureModifiersEx();
+                msgBuilder.append(": src=");
+                msgBuilder.append(actionString(ds.getSourceActions()));
+                msgBuilder.append(" usr=");
+                msgBuilder.append(actionString(ev.getUserAction()));
+                msgBuilder.append(" tgt=");
+                msgBuilder.append(actionString(ev.getTargetActions()));
+                msgBuilder.append(" act=");
+                msgBuilder.append(actionString(ev.getDropAction()));
+                msgBuilder.append(" mods=");
+                msgBuilder.append(ev.getGestureModifiersEx());
             }
             else {
-                msg += ": e=" + e;
+                msgBuilder.append(": e=");
+                msgBuilder.append(e);
             }
+            String msg = msgBuilder.toString();
             if (!msg.equals(lastAction)) {
-                System.out.println(lastAction = msg);
+                LOG.log(Level.FINE, msg);
+                lastAction = msg;
             }
         }
     }
 
+    @Override
     public void dragDropEnd(DragSourceDropEvent e) {
         describe("end", e);
         setModifiers(UNKNOWN_MODIFIERS);
@@ -521,6 +544,7 @@ public abstract class DragHandler
         return where;
     }
     
+    @Override
     public void dragEnter(DragSourceDragEvent e) {
         describe("enter", e);
         if (ghost != null) {
@@ -533,6 +557,7 @@ public abstract class DragHandler
     // which has reports "0" for the available target actions (1.4+?)
     // filed a bug for this
     private boolean moved;
+    @Override
     public void dragMouseMoved(DragSourceDragEvent e) {
         describe("move", e);
         if (ghost != null) {
@@ -543,6 +568,7 @@ public abstract class DragHandler
         moved = true;
     }
 
+    @Override
     public void dragOver(DragSourceDragEvent e) {
         describe("over", e);
         if (ghost != null) {
@@ -551,10 +577,12 @@ public abstract class DragHandler
         updateCursor(e);
     }
 
+    @Override
     public void dragExit(DragSourceEvent e) {
         describe("exit", e);
     }
 
+    @Override
     public void dropActionChanged(DragSourceDragEvent e) {
         describe("change", e);
         setModifiers(e.getGestureModifiersEx() & KEY_MASK);

@@ -12,6 +12,8 @@
  */
 package com.sun.jna.platform.win32.COM;
 
+import com.sun.jna.Pointer;
+import static com.sun.jna.platform.win32.AbstractWin32TestSupport.checkCOMRegistered;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 
@@ -25,15 +27,19 @@ import com.sun.jna.platform.win32.WinDef.DWORD;
 import com.sun.jna.platform.win32.WinDef.ULONG;
 import com.sun.jna.platform.win32.WinDef.ULONGByReference;
 import com.sun.jna.platform.win32.WinNT.HRESULT;
-import com.sun.jna.platform.win32.COM.util.Factory;
+import com.sun.jna.platform.win32.COM.util.ObjectFactory;
 import com.sun.jna.platform.win32.COM.util.annotation.ComInterface;
 import com.sun.jna.platform.win32.COM.util.annotation.ComMethod;
 import com.sun.jna.platform.win32.COM.util.annotation.ComObject;
 import com.sun.jna.platform.win32.COM.util.annotation.ComProperty;
 import com.sun.jna.ptr.PointerByReference;
+import org.junit.Assume;
 
 public class EnumMoniker_Test {
-	
+        static {
+            ClassLoader.getSystemClassLoader().setDefaultAssertionStatus(true);
+        }
+    
 	@ComInterface(iid="{00020970-0000-0000-C000-000000000046}")
 	interface Application {
 		@ComProperty
@@ -50,26 +56,37 @@ public class EnumMoniker_Test {
 	interface MsWordApp extends Application {
 	}
 	
-	Factory factory;
-	MsWordApp ob1;
-	MsWordApp ob2;
+	private ObjectFactory factory;
+	private MsWordApp ob1;
+	private MsWordApp ob2;
+        private boolean initialized = false;
 
 	@Before
 	public void before() {
-		this.factory = new Factory();
+                // Check Existence of Word Application
+                Assume.assumeTrue("Could not find registration", checkCOMRegistered("{00020970-0000-0000-C000-000000000046}"));
+                COMUtils.checkRC(Ole32.INSTANCE.CoInitializeEx(Pointer.NULL, Ole32.COINIT_MULTITHREADED));
+                initialized = true;
+		this.factory = new ObjectFactory();
 		// Two COM objects are require to be running for these tests to work
 		this.ob1 = this.factory.createObject(MsWordApp.class);
 		this.ob2 = this.factory.createObject(MsWordApp.class);
-		
-		WinNT.HRESULT hr = Ole32.INSTANCE.CoInitialize(null);
-		COMUtils.checkRC(hr);
 	}
 
 	@After
 	public void after() {
-		ob1.Quit();
-		ob2.Quit();
-		Ole32.INSTANCE.CoUninitialize();
+                if(ob1 != null) {
+                    ob1.Quit();
+                }
+                if(ob2 != null) {
+                    ob2.Quit();
+                }
+                if(factory != null) {
+                    factory.disposeAll();
+                }
+                if(initialized) {
+                    Ole32.INSTANCE.CoUninitialize();
+                }
 	}
 
 	@Test

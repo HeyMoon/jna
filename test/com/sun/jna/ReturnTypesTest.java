@@ -1,22 +1,31 @@
 /* Copyright (c) 2007 Timothy Wall, All Rights Reserved
  *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- * <p/>
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
+ * 
+ * You can freely decide which license you want to apply to 
+ * the project.
+ * 
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
 package com.sun.jna;
 
-import java.util.Arrays;
-import java.util.HashMap;
+import java.nio.charset.Charset;
+import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-
 import junit.framework.TestCase;
 
 import com.sun.jna.ReturnTypesTest.TestLibrary.SimpleStructure;
@@ -30,12 +39,16 @@ import com.sun.jna.ReturnTypesTest.TestLibrary.TestStructure;
 public class ReturnTypesTest extends TestCase {
 
     private static final String UNICODE = "[\u0444]";
+    private static final int INT_MAGIC = 0x12345678;
+    private static final long LONG_MAGIC = 0x123456789ABCDEF0L;
     private static final double DOUBLE_MAGIC = -118.625d;
     private static final float FLOAT_MAGIC = -118.625f;
+    private static final String STRING_MAGIC = "magic";
 
     public static interface TestLibrary extends Library {
 
         public static class SimpleStructure extends Structure {
+            public static final List<String> FIELDS = createFieldsOrder("value");
             public double value;
             public static int allocations = 0;
             public SimpleStructure() { }
@@ -46,49 +59,55 @@ public class ReturnTypesTest extends TestCase {
                 ++allocations;
             }
             @Override
-            protected List getFieldOrder() {
-                return Arrays.asList(new String[] { "value" });
+            protected List<String> getFieldOrder() {
+                return FIELDS;
             }
         }
 
         public static class TestSmallStructure extends Structure {
             public static class ByValue extends TestSmallStructure implements Structure.ByValue { }
+
+            public static final List<String> FIELDS = createFieldsOrder("c1", "c2", "s");
             public byte c1;
             public byte c2;
             public short s;
             @Override
-            protected List getFieldOrder() {
-                return Arrays.asList(new String[] { "c1", "c2", "s" });
+            protected List<String> getFieldOrder() {
+                return FIELDS;
             }
         }
 
         public static class TestStructure extends Structure {
             public static class ByValue extends TestStructure implements Structure.ByValue { }
+
+            public static final List<String> FIELDS = createFieldsOrder("c", "s", "i", "j", "inner");
             public byte c;
             public short s;
             public int i;
             public long j;
             public SimpleStructure inner;
             @Override
-            protected List getFieldOrder() {
-                return Arrays.asList(new String[] { "c", "s", "i", "j", "inner" });
+            protected List<String> getFieldOrder() {
+                return FIELDS;
             }
         }
 
-        class CheckFieldAlignment extends Structure {
+        public static class CheckFieldAlignment extends Structure {
+            public static final List<String> FIELDS = createFieldsOrder("int32Field", "int64Field", "floatField", "doubleField");
             public int int32Field = 1;
             public long int64Field = 2;
             public float floatField = 3f;
             public double doubleField = 4d;
             @Override
-            protected List getFieldOrder() {
-                return Arrays.asList(new String[] { "int32Field", "int64Field", "floatField", "doubleField" });
+            protected List<String> getFieldOrder() {
+                return FIELDS;
             }
         }
 
         class TestObject { }
         Object returnObjectArgument(Object s);
         TestObject returnObjectArgument(TestObject s);
+        Class returnClass(JNIEnv env, Object arg);
         boolean returnFalse();
         boolean returnTrue();
         int returnInt32Zero();
@@ -114,29 +133,33 @@ public class ReturnTypesTest extends TestCase {
     }
 
     TestLibrary lib;
+    TestLibrary libSupportingObject;
+    NativeMappedLibrary libNativeMapped;
+
     @Override
     protected void setUp() {
-        lib = Native.loadLibrary("testlib", TestLibrary.class);
+        lib = Native.load("testlib", TestLibrary.class);
+        libSupportingObject = Native.load("testlib", TestLibrary.class,
+                Collections.singletonMap(Library.OPTION_ALLOW_OBJECTS, Boolean.TRUE));
+        libNativeMapped = Native.load("testlib", NativeMappedLibrary.class);
     }
 
     @Override
     protected void tearDown() {
         lib = null;
+        libSupportingObject = null;
+        libNativeMapped = null;
     }
 
     public void testReturnObject() throws Exception {
-        Map options = new HashMap() { {
-            put(Library.OPTION_ALLOW_OBJECTS, Boolean.TRUE);
-        }};
-        lib = Native.loadLibrary("testlib", TestLibrary.class, options);
-        assertNull("null value not returned", lib.returnObjectArgument(null));
+        assertNull("null value not returned", libSupportingObject.returnObjectArgument(null));
         final Object VALUE = new Object() {
             @Override
             public String toString() {
                 return getName();
             }
         };
-        assertEquals("Wrong object returned", VALUE, lib.returnObjectArgument(VALUE));
+        assertEquals("Wrong object returned", VALUE, libSupportingObject.returnObjectArgument(VALUE));
     }
 
     public void testReturnObjectUnsupported() throws Exception {
@@ -153,6 +176,13 @@ public class ReturnTypesTest extends TestCase {
         }
     }
 
+    public void testReturnClass() throws Exception {
+        assertEquals("Wrong class returned", Class.class,
+                libSupportingObject.returnClass(JNIEnv.CURRENT, TestLibrary.class));
+        assertEquals("Wrong class returned", StringBuilder.class,
+                libSupportingObject.returnClass(JNIEnv.CURRENT, new StringBuilder()));
+    }
+
     public void testInvokeBoolean() {
         assertFalse("Expect false", lib.returnFalse());
         assertTrue("Expect true", lib.returnTrue());
@@ -160,31 +190,23 @@ public class ReturnTypesTest extends TestCase {
 
     public void testInvokeInt() {
         assertEquals("Expect 32-bit zero", 0, lib.returnInt32Zero());
-        assertEquals("Expect 32-bit magic",
-                     "12345678",
-                     Integer.toHexString(lib.returnInt32Magic()));
+        assertEquals("Expect 32-bit magic", INT_MAGIC, lib.returnInt32Magic());
     }
 
     public void testInvokeLong() {
         assertEquals("Expect 64-bit zero", 0L, lib.returnInt64Zero());
-        assertEquals("Expect 64-bit magic",
-                     "123456789abcdef0",
-                     Long.toHexString(lib.returnInt64Magic()));
+        assertEquals("Expect 64-bit magic", LONG_MAGIC, lib.returnInt64Magic());
     }
 
     public void testInvokeNativeLong() {
         if (NativeLong.SIZE == 4) {
             assertEquals("Expect 32-bit zero", new NativeLong(0), lib.returnLongZero());
             assertEquals("Expect 32-bit magic",
-                         "12345678",
-                         Integer.toHexString(lib.returnLongMagic().intValue()));
-
+                         new NativeLong(INT_MAGIC), lib.returnLongMagic());
         } else {
-            assertEquals("Expect 64-bit zero", new NativeLong(0L),
-                         lib.returnLongZero());
+            assertEquals("Expect 64-bit zero", new NativeLong(0L), lib.returnLongZero());
             assertEquals("Expect 64-bit magic",
-                         "123456789abcdef0",
-                         Long.toHexString(lib.returnLongMagic().longValue()));
+                         new NativeLong(LONG_MAGIC), lib.returnLongMagic());
         }
     }
 
@@ -194,6 +216,7 @@ public class ReturnTypesTest extends TestCase {
         size_t returnInt64Magic();
     }
     public static class size_t extends IntegerType {
+        private static final long serialVersionUID = 1L;
         public size_t() {
             this(0);
         }
@@ -213,34 +236,29 @@ public class ReturnTypesTest extends TestCase {
             return new Custom(((Integer)nativeValue).intValue());
         }
         @Override
-        public Class nativeType() {
+        public Class<?> nativeType() {
             return Integer.class;
         }
         @Override
         public Object toNative() {
-            return new Integer(value);
+            return Integer.valueOf(value);
         }
         @Override
         public boolean equals(Object o) {
             return o instanceof Custom && ((Custom)o).value == value;
         }
     }
-    protected NativeMappedLibrary loadNativeMappedLibrary() {
-        return Native.loadLibrary("testlib", NativeMappedLibrary.class);
-    }
 
     public void testInvokeNativeMapped() {
-        NativeMappedLibrary lib = loadNativeMappedLibrary();
-        final int MAGIC = 0x12345678;
-        final long MAGIC64 = 0x123456789ABCDEF0L;
-        final Custom EXPECTED = new Custom(MAGIC);
-        assertEquals("NativeMapped 'Custom' result not mapped", EXPECTED, lib.returnInt32Argument(MAGIC));
+        final Custom EXPECTED = new Custom(INT_MAGIC);
+        assertEquals("NativeMapped 'Custom' result not mapped",
+                     EXPECTED, libNativeMapped.returnInt32Argument(INT_MAGIC));
 
         assertEquals("NativeMapped IntegerType result not mapped (32)",
-                     new size_t(MAGIC), lib.returnInt32Magic());
+                     new size_t(INT_MAGIC), libNativeMapped.returnInt32Magic());
         if (Native.SIZE_T_SIZE == 8) {
             assertEquals("NativeMapped IntegerType result not mapped (64)",
-                         new size_t(MAGIC64), lib.returnInt64Magic());
+                         new size_t(LONG_MAGIC), libNativeMapped.returnInt64Magic());
         }
     }
 
@@ -256,15 +274,14 @@ public class ReturnTypesTest extends TestCase {
                      DOUBLE_MAGIC, lib.returnDoubleMagic(), 0d);
     }
 
-    static final String MAGIC = "magic";
     public void testInvokeString() {
-        assertEquals("Expect String magic", MAGIC, lib.returnStringMagic());
+        assertEquals("Expect String magic", STRING_MAGIC, lib.returnStringMagic());
     }
 
     public void testInvokeWString() {
         WString s = lib.returnWStringMagic();
-        assertEquals("Wrong length", MAGIC.length(), s.toString().length());
-        assertEquals("Expect WString magic", new WString(MAGIC), s);
+        assertEquals("Wrong length", STRING_MAGIC.length(), s.length());
+        assertEquals("Expect WString magic", new WString(STRING_MAGIC), s);
     }
 
     public void testInvokeStructure() {
@@ -313,7 +330,8 @@ public class ReturnTypesTest extends TestCase {
     }
 
     public void testReturnStringArray() {
-        final String VALUE = getName() + UNICODE;
+        Charset charset = Charset.forName(Native.getDefaultStringEncoding());
+        final String VALUE = getName() + charset.decode(charset.encode(UNICODE));
         String[] input = {
             VALUE, null,
         };

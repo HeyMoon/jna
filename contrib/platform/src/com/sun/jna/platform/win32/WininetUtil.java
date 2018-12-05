@@ -1,14 +1,25 @@
 /* Copyright (c) 2015 Michael Freeman, All Rights Reserved
  * 
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
  * 
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.  
+ * You can freely decide which license you want to apply to 
+ * the project.
+ * 
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
 package com.sun.jna.platform.win32;
 
@@ -32,7 +43,7 @@ public class WininetUtil {
      * Some entries are cookies, some entries are history items, and some are
      * actual files.<br>
      * 
-     * @return A map of cache URL => local file (or URL => empty string for
+     * @return A map of cache URL =&gt; local file (or URL =&gt; empty string for
      *         cookie and history entries)
      */
     public static Map<String, String> getCache() {
@@ -112,7 +123,7 @@ public class WininetUtil {
                 if (!Wininet.INSTANCE.FindCloseUrlCache(cacheHandle)) {
                     if (we != null) {
                         Win32Exception e = new Win32Exception(Native.getLastError());
-                        e.addSuppressed(we);
+                        e.addSuppressedReflected(we);
                         we = e;
                     }
                 }

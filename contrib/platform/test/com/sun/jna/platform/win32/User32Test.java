@@ -49,6 +49,7 @@ import com.sun.jna.platform.win32.WinUser.LASTINPUTINFO;
 import com.sun.jna.platform.win32.WinUser.MONITORENUMPROC;
 import com.sun.jna.platform.win32.WinUser.MONITORINFO;
 import com.sun.jna.platform.win32.WinUser.MONITORINFOEX;
+import org.junit.Before;
 
 /**
  * @author dblock[at]dblock[dot]org
@@ -57,6 +58,11 @@ public class User32Test extends AbstractWin32TestSupport {
 
     public static void main(String[] args) {
         JUnitCore.runClasses(User32Test.class);
+    }
+
+    @Before
+    public void setUp() {
+        Native.setLastError(0);
     }
 
     /**
@@ -88,6 +94,8 @@ public class User32Test extends AbstractWin32TestSupport {
             for (String name : new String[] {
                     // has 2 overloads since the original API accepts both MONITORINFO and MONITORINFOEX
                     "GetMonitorInfo"
+                    // has 2 overloads since there was a broken binding for MonitorFromPoint
+                    ,"MonitorFromPoint"
                 }) {
                 dupSet.remove(name);
             }
@@ -184,7 +192,7 @@ public class User32Test extends AbstractWin32TestSupport {
     public final void testMonitorFromPoint() {
         int dwFlags = WinUser.MONITOR_DEFAULTTOPRIMARY;
 
-        POINT pt = new POINT(0, 0);
+        POINT.ByValue pt = new POINT.ByValue(0, 0);
         assertNotNull(User32.INSTANCE.MonitorFromPoint(pt, dwFlags));
     }
 
@@ -205,7 +213,7 @@ public class User32Test extends AbstractWin32TestSupport {
 
     @Test
     public final void testGetMonitorInfo() {
-        HMONITOR hMon = User32.INSTANCE.MonitorFromPoint(new POINT(0, 0), WinUser.MONITOR_DEFAULTTOPRIMARY);
+        HMONITOR hMon = User32.INSTANCE.MonitorFromWindow(User32.INSTANCE.GetDesktopWindow(), WinUser.MONITOR_DEFAULTTOPRIMARY);
 
         assertTrue(User32.INSTANCE.GetMonitorInfo(hMon, new MONITORINFO()).booleanValue());
 
@@ -297,16 +305,20 @@ public class User32Test extends AbstractWin32TestSupport {
 
     @Test
     public void testGetClassLongPtr() {
-        DesktopWindow explorerProc = getWindowByProcessPath("explorer.exe");
+        if (System.getProperty("os.arch", "unknown").equalsIgnoreCase("amd64")) {
+            DesktopWindow explorerProc = getWindowByProcessPath("explorer.exe");
 
-        assertNotNull("Could not find explorer.exe process",
-                              explorerProc);
+            assertNotNull("Could not find explorer.exe process",
+                    explorerProc);
 
-        ULONG_PTR result = User32.INSTANCE
+            ULONG_PTR result = User32.INSTANCE
                     .GetClassLongPtr(explorerProc.getHWND(),
-                                     WinUser.GCLP_HMODULE);
+                            WinUser.GCLP_HMODULE);
 
-        assertNotEquals(0, result.intValue());
+            assertNotEquals(0, result.intValue());
+        } else {
+            System.err.println("GetClassLongPtr only supported on x64");
+        }
     }
 
     @Test
@@ -333,7 +345,6 @@ public class User32Test extends AbstractWin32TestSupport {
     public void testIsWindow() {
         boolean iwResult = User32.INSTANCE.IsWindow(null);
         assertFalse("IsWindow result should be false", iwResult);
-        assertEquals("GetLastError should be ERROR_SUCCESS.", WinError.ERROR_SUCCESS, Native.getLastError());
     }
     
     @Test
@@ -350,7 +361,6 @@ public class User32Test extends AbstractWin32TestSupport {
         
         HWND result = User32.INSTANCE.GetAncestor(desktopWindow, WinUser.GA_PARENT);
         assertNull("GetAncestor result should be null", result);
-        assertEquals("GetLastError should be ERROR_SUCCESS.", WinError.ERROR_SUCCESS, Native.getLastError());
     }
     
     @Test
@@ -369,13 +379,18 @@ public class User32Test extends AbstractWin32TestSupport {
         assertTrue("GetCursorPos should return true", result);
         assertTrue("X coordinate in POINT should be >= 0", cursorPos.x >= 0);
         
-        boolean scpResult = User32.INSTANCE.SetCursorPos(cursorPos.x - 20, cursorPos.y);
+        boolean scpResult = User32.INSTANCE.SetCursorPos(cursorPos.x + 20, cursorPos.y);
         assertTrue("SetCursorPos should return true", scpResult);
         
         POINT cursorPos2 = new POINT();
         boolean result2 = User32.INSTANCE.GetCursorPos(cursorPos2);
         assertTrue("GetCursorPos should return true", result2);
-        assertTrue("X coordinate in POINT should be original cursor position - 20", cursorPos2.x  == cursorPos.x - 20);
+        assertTrue(String.format(
+                "X coordinate in POINT should be original cursor position - 20 (Old: %dx%d, New: %dx%d)",
+                cursorPos.x, cursorPos.y, cursorPos2.x, cursorPos2.y
+                ),
+                cursorPos2.x == cursorPos.x + 20
+        );
     }
     
     @Test
@@ -405,4 +420,27 @@ public class User32Test extends AbstractWin32TestSupport {
         assertEquals("GetClassLong result should be 0", 0, result);
         assertEquals("GetLastError should be ERROR_INVALID_WINDOW_HANDLE.", WinError.ERROR_INVALID_WINDOW_HANDLE, Native.getLastError());
     }
+    
+    @Test
+    public void testGetActiveWindow() {
+        HWND result = User32.INSTANCE.GetActiveWindow();
+        assertNull("GetActiveWindow result should be null (there is no active window)", result);
+    }
+    
+    @Test
+    public void testSendMessage() {
+    	 DesktopWindow explorerProc = getWindowByProcessPath("explorer.exe");
+
+         assertNotNull(explorerProc);
+
+         LRESULT result = User32.INSTANCE
+                     .SendMessage(explorerProc.getHWND(),
+                                         WinUser.WM_USER,
+                                         new WPARAM(124),
+                                         new LPARAM(12345));
+
+         assertNotEquals(0, result);
+    	
+    }
+    
 }

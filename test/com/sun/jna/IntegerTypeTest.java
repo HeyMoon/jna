@@ -1,3 +1,25 @@
+/**
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
+ * 
+ * You can freely decide which license you want to apply to 
+ * the project.
+ * 
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
+ */
 package com.sun.jna;
 
 import java.util.Arrays;
@@ -8,6 +30,7 @@ import junit.framework.TestCase;
 public class IntegerTypeTest extends TestCase {
 
     public static class Sized extends IntegerType {
+        private static final long serialVersionUID = 1L;
         public Sized() { this(4, 0); }
         public Sized(int size, long value) { super(size, value); }
     }
@@ -16,8 +39,8 @@ public class IntegerTypeTest extends TestCase {
         class NTStruct extends Structure {
             public Sized field;
             @Override
-            protected List getFieldOrder() {
-                return Arrays.asList(new String[] { "field" });
+            protected List<String> getFieldOrder() {
+                return Arrays.asList("field");
             }
         }
         NTStruct s = new NTStruct();
@@ -27,8 +50,8 @@ public class IntegerTypeTest extends TestCase {
         class NTStruct extends Structure {
             public Sized field;
             @Override
-            protected List getFieldOrder() {
-                return Arrays.asList(new String[] { "field" });
+            protected List<String> getFieldOrder() {
+                return Arrays.asList("field");
             }
         }
         NTStruct s = new NTStruct();
@@ -78,6 +101,8 @@ public class IntegerTypeTest extends TestCase {
 
     public void testValueBoundaries() {
         class TestType extends IntegerType {
+            private static final long serialVersionUID = 1L;
+
             public TestType(int size, long value) {
                 super(size, value);
             }
@@ -104,6 +129,8 @@ public class IntegerTypeTest extends TestCase {
 
     public void testUnsignedValues() {
         class TestType extends IntegerType {
+            private static final long serialVersionUID = 1L;
+
             public TestType(int size, long value) {
                 super(size, value);
             }
@@ -116,6 +143,8 @@ public class IntegerTypeTest extends TestCase {
         assertEquals("Wrong unsigned int value", VALUE, new TestType(4, VALUE).longValue());
 
         class UnsignedTestType extends IntegerType {
+            private static final long serialVersionUID = 1L;
+
             public UnsignedTestType(int size, long value) {
                 super(size, value, true);
             }

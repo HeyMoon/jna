@@ -1,28 +1,39 @@
 /* Copyright (c) 2015 Adam Marcionek, All Rights Reserved
- * 
  *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
+ * The contents of this file is dual-licensed under 2 
+ * alternative Open Source/Free licenses: LGPL 2.1 or later and 
+ * Apache License 2.0. (starting with JNA version 4.0.0).
  * 
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.  
+ * You can freely decide which license you want to apply to 
+ * the project.
+ * 
+ * You may obtain a copy of the LGPL License at:
+ * 
+ * http://www.gnu.org/licenses/licenses.html
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "LGPL2.1".
+ * 
+ * You may obtain a copy of the Apache License at:
+ * 
+ * http://www.apache.org/licenses/
+ * 
+ * A copy is also included in the downloadable source code package
+ * containing JNA, in file "AL2.0".
  */
 
 package com.sun.jna.platform.win32;
 
-import java.util.Arrays;
 import java.util.List;
 
 import com.sun.jna.Pointer;
 import com.sun.jna.Structure;
+import com.sun.jna.Structure.FieldOrder;
+import com.sun.jna.win32.W32APITypeMapper;
 
 /**
  * Ported from AccCtrl.h. Microsoft Windows SDK 7.1
- * 
+ *
  * @author amarcionek[at]gmail.com
  */
 
@@ -270,6 +281,7 @@ public abstract class Winnetwk {
     /**
      * The NETRESOURCE structure contains information about a network resource.
      */
+    @FieldOrder({"dwScope", "dwType", "dwDisplayType", "dwUsage", "lpLocalName", "lpRemoteName", "lpComment", "lpProvider"})
     public static class NETRESOURCE extends Structure {
 
         public static class ByReference extends NETRESOURCE implements Structure.ByReference {
@@ -281,20 +293,6 @@ public abstract class Winnetwk {
             public ByReference(Pointer memory) {
                 super(memory);
             }
-        }
-
-        public NETRESOURCE() {
-
-        }
-
-        public NETRESOURCE(Pointer address) {
-            super(address);
-            read();
-        }
-
-        @Override
-        protected List getFieldOrder() {
-            return Arrays.asList("dwScope", "dwType", "dwDisplayType", "dwUsage", "lpLocalName", "lpRemoteName", "lpComment", "lpProvider");
         }
 
         /**
@@ -333,11 +331,11 @@ public abstract class Winnetwk {
          * If the entry is a network resource, this member is a pointer to a
          * null-terminated character string that specifies the remote network
          * name.
-         * 
+         *
          * If the entry is a current or persistent connection, lpRemoteName
          * member points to the network name associated with the name pointed to
          * by the lpLocalName member.
-         * 
+         *
          * The string can be MAX_PATH characters in length, and it must follow
          * the network provider's naming conventions
          */
@@ -356,6 +354,15 @@ public abstract class Winnetwk {
          * the WNetGetProviderName function.
          */
         public String lpProvider;
+
+        public NETRESOURCE() {
+            super(W32APITypeMapper.DEFAULT);
+        }
+
+        public NETRESOURCE(Pointer address) {
+            super(address, Structure.ALIGN_DEFAULT, W32APITypeMapper.DEFAULT);
+            read();
+        }
     }
 
     //
@@ -368,26 +375,18 @@ public abstract class Winnetwk {
      * The UNIVERSAL_NAME_INFO structure contains a pointer to a Universal
      * Naming Convention (UNC) name string for a network resource.
      */
+    @FieldOrder({"lpUniversalName"})
     public static class UNIVERSAL_NAME_INFO extends Structure {
 
         public static class ByReference extends REMOTE_NAME_INFO implements Structure.ByReference {
 
             public ByReference() {
-
+                super();
             }
 
             public ByReference(Pointer memory) {
                 super(memory);
             }
-        }
-
-        public UNIVERSAL_NAME_INFO() {
-
-        }
-
-        public UNIVERSAL_NAME_INFO(Pointer address) {
-            super(address);
-            read();
         }
 
         /**
@@ -396,9 +395,13 @@ public abstract class Winnetwk {
          */
         public String lpUniversalName;
 
-        @Override
-        protected List getFieldOrder() {
-            return Arrays.asList("lpUniversalName");
+        public UNIVERSAL_NAME_INFO() {
+            super(W32APITypeMapper.DEFAULT);
+        }
+
+        public UNIVERSAL_NAME_INFO(Pointer address) {
+            super(address, Structure.ALIGN_DEFAULT, W32APITypeMapper.DEFAULT);
+            read();
         }
     }
 
@@ -408,6 +411,7 @@ public abstract class Winnetwk {
      * Universal Naming Convention (UNC) name string for the resource, and two
      * members that point to additional network connection information strings.
      */
+    @FieldOrder({"lpUniversalName", "lpConnectionName", "lpRemainingPath"})
     public static class REMOTE_NAME_INFO extends Structure {
 
         public static class ByReference extends REMOTE_NAME_INFO implements Structure.ByReference {
@@ -419,15 +423,6 @@ public abstract class Winnetwk {
             public ByReference(Pointer memory) {
                 super(memory);
             }
-        }
-
-        public REMOTE_NAME_INFO() {
-
-        }
-
-        public REMOTE_NAME_INFO(Pointer address) {
-            super(address);
-            read();
         }
 
         /**
@@ -447,9 +442,13 @@ public abstract class Winnetwk {
          */
         public String lpRemainingPath;
 
-        @Override
-        protected List getFieldOrder() {
-            return Arrays.asList("lpUniversalName", "lpConnectionName", "lpRemainingPath");
+        public REMOTE_NAME_INFO() {
+            super(W32APITypeMapper.DEFAULT);
+        }
+
+        public REMOTE_NAME_INFO(Pointer address) {
+            super(address, Structure.ALIGN_DEFAULT, W32APITypeMapper.DEFAULT);
+            read();
         }
     }
 }
